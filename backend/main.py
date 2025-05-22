@@ -1,5 +1,5 @@
 """FastAPI backend for MLOps app deployment."""
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -66,7 +66,11 @@ def save_status(app_id: str, status: str, log_path: str = None):
     conn.close()
 
 @app.post("/upload")
-async def upload_app(file: UploadFile = File(...)):
+async def upload_app(
+    file: UploadFile = File(...),
+    allow_ips: str = Form(None),
+    auth_header: str = Form(None),
+):
     """Receive user uploaded app and trigger agent build/run."""
     app_id = str(uuid.uuid4())
     app_dir = os.path.join(UPLOAD_DIR, app_id)
@@ -100,7 +104,14 @@ async def upload_app(file: UploadFile = File(...)):
     try:
         resp = requests.post(
             f"{AGENT_URL}/run",
-            json={"app_id": app_id, "path": app_dir, "type": app_type, "log_path": log_path},
+            json={
+                "app_id": app_id,
+                "path": app_dir,
+                "type": app_type,
+                "log_path": log_path,
+                "allow_ips": [ip.strip() for ip in allow_ips.split(",") if ip.strip()] if allow_ips else None,
+                "auth_header": auth_header,
+            },
             timeout=5
         )
         resp.raise_for_status()
