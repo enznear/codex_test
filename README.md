@@ -2,6 +2,14 @@
 
 This repository contains a sample FastAPI backend and agent for deploying user uploaded Gradio or Docker apps on a GPU server.
 
+## Setup
+
+Install the required Python packages:
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Backend
 
 Run the backend server:
