@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="root" class="container mx-auto p-4"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [name, setName] = useState('');
+      const [description, setDescription] = useState('');
+      const [runType, setRunType] = useState('gradio');
+      const [files, setFiles] = useState([]);
+      const [apps, setApps] = useState([]);
+      const [logs, setLogs] = useState({});
+      const [showLogs, setShowLogs] = useState({});
+
+      useEffect(() => {
+        fetch('/status')
+          .then(res => res.json())
+          .then(data => {
+            const list = Object.entries(data).map(([id, status]) => ({ id, status }));
+            setApps(list);
+          })
+          .catch(() => {});
+      }, []);
+
+      const refreshStatus = () => {
+        fetch('/status')
+          .then(res => res.json())
+          .then(data => {
+            const list = Object.entries(data).map(([id, status]) => ({ id, status }));
+            setApps(list);
+          });
+      };
+
+      const handleUpload = (e) => {
+        e.preventDefault();
+        if (files.length === 0) return;
+        const formData = new FormData();
+        formData.append('file', files[0]);
+        fetch('/upload', {
+          method: 'POST',
+          body: formData
+        }).then(() => {
+          setName('');
+          setDescription('');
+          setRunType('gradio');
+          setFiles([]);
+          refreshStatus();
+        }).catch(() => {});
+      };
+
+      const toggleLogs = (appId) => {
+        if (showLogs[appId]) {
+          setShowLogs(prev => ({ ...prev, [appId]: false }));
+          return;
+        }
+        fetch(`/logs/${appId}`)
+          .then(res => res.text())
+          .then(text => {
+            setLogs(prev => ({ ...prev, [appId]: text }));
+            setShowLogs(prev => ({ ...prev, [appId]: true }));
+          })
+          .catch(() => {
+            setLogs(prev => ({ ...prev, [appId]: 'Failed to load logs.' }));
+            setShowLogs(prev => ({ ...prev, [appId]: true }));
+          });
+      };
+
+      return (
+        <div>
+          <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
+          <form onSubmit={handleUpload} className="bg-white p-4 rounded shadow mb-6 grid gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="name">App Name</label>
+              <input id="name" type="text" className="mt-1 p-2 border rounded w-full" placeholder="My Awesome App" value={name} onChange={e => setName(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="desc">Description</label>
+              <input id="desc" type="text" className="mt-1 p-2 border rounded w-full" placeholder="Short description" value={description} onChange={e => setDescription(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="type">Run Type</label>
+              <select id="type" className="mt-1 p-2 border rounded w-full" value={runType} onChange={e => setRunType(e.target.value)}>
+                <option value="gradio">Gradio</option>
+                <option value="docker">Docker</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="file">Upload File</label>
+              <input id="file" type="file" className="mt-1 p-2 border rounded w-full" onChange={e => setFiles(e.target.files)} multiple />
+            </div>
+            <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Upload</button>
+          </form>
+
+          <div className="grid gap-4">
+            {apps.map(app => (
+              <div key={app.id} className="bg-white p-4 rounded shadow">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="font-semibold">{app.id}</h2>
+                    <p className="text-sm text-gray-600">Status: {app.status}</p>
+                  </div>
+                  <div>
+                    <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
+                  </div>
+                </div>
+                {showLogs[app.id] && (
+                  <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}}>{logs[app.id] || 'Loading...'}</pre>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

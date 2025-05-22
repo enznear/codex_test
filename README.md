@@ -66,3 +66,12 @@ uvicorn agent.agent:app --port 8001
   Defaults to `http://localhost:8001`.
 - `BACKEND_URL`: URL of the backend API (used by the agent).
   Defaults to `http://localhost:8000`.
+## Frontend
+
+A minimal React+Tailwind UI is available in `frontend/index.html`. It can be served using any static file server. For example:
+
+```bash
+python -m http.server 3000 --directory frontend
+```
+
+Then open `http://localhost:3000` in your browser.
