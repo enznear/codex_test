@@ -42,6 +42,22 @@ uvicorn backend.main:app --reload
 - `GET /logs/{app_id}`: view logs for an app.
 - `POST /update_status`: (used by agent) update status in the database.
 
+### Uploading Gradio or Docker apps
+
+1. **Prepare your files**
+   - **Gradio**: upload a single Python file or a zip archive containing your Gradio app. The backend will run the first `.py` file it finds in the uploaded directory.
+   - **Docker**: include a `Dockerfile` in the uploaded directory or archive. If a `Dockerfile` is present the backend treats the app as a Docker project and builds it with `docker build`.
+
+2. **Send a request**
+   - Via the frontend: open `frontend/index.html` in a browser and select a file to upload.
+   - Via `curl`:
+
+     ```bash
+     curl -F "file=@my_app.zip" http://localhost:8000/upload
+     ```
+
+   Replace `my_app.zip` with your Python script or zipped folder. The response will include an `app_id` that can be used to check status.
+
 ## Agent
 
 Run the agent on a GPU server:
