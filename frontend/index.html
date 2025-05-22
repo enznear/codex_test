@@ -23,6 +23,7 @@
       const [apps, setApps] = useState([]);
       const [logs, setLogs] = useState({});
       const [showLogs, setShowLogs] = useState({});
+      const [uploadMsg, setUploadMsg] = useState('');
 
       useEffect(() => {
         fetch('/status')
@@ -47,17 +48,26 @@
         e.preventDefault();
         if (files.length === 0) return;
         const formData = new FormData();
+        formData.append('name', name);
         formData.append('file', files[0]);
         fetch('/upload', {
           method: 'POST',
           body: formData
-        }).then(() => {
-          setName('');
-          setDescription('');
-          setRunType('gradio');
-          setFiles([]);
-          refreshStatus();
-        }).catch(() => {});
+        }).then(async res => {
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            setUploadMsg('Upload started: ' + data.app_id);
+            setName('');
+            setDescription('');
+            setRunType('gradio');
+            setFiles([]);
+            refreshStatus();
+          } else {
+            setUploadMsg('Error: ' + (data.detail || 'upload failed'));
+          }
+        }).catch(() => {
+          setUploadMsg('Error uploading app.');
+        });
       };
 
       const toggleLogs = (appId) => {
@@ -80,7 +90,7 @@
       return (
         <div>
           <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
-          <form onSubmit={handleUpload} className="bg-white p-4 rounded shadow mb-6 grid gap-4">
+          <form onSubmit={handleUpload} className="bg-white p-4 rounded shadow mb-2 grid gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700" htmlFor="name">App Name</label>
               <input id="name" type="text" className="mt-1 p-2 border rounded w-full" placeholder="My Awesome App" value={name} onChange={e => setName(e.target.value)} />
@@ -102,6 +112,7 @@
             </div>
             <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Upload</button>
           </form>
+          {uploadMsg && <p className="text-sm mt-2">{uploadMsg}</p>}
 
           <div className="grid gap-4">
             {apps.map(app => (

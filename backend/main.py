@@ -1,5 +1,5 @@
 """FastAPI backend for MLOps app deployment."""
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -53,21 +53,35 @@ class StatusUpdate(BaseModel):
     status: str
 
 
-def save_status(app_id: str, status: str, log_path: str = None):
+def save_status(app_id: str, status: str, log_path: str = None, name: str = None, app_type: str = None):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
     exists = c.fetchone()
     if exists:
-        c.execute("UPDATE apps SET status=?, log_path=? WHERE id=?", (status, log_path, app_id))
+        c.execute(
+            "UPDATE apps SET status=?, log_path=? WHERE id=?",
+            (status, log_path, app_id),
+        )
     else:
-        c.execute("INSERT INTO apps(id, name, type, status, log_path) VALUES(?,?,?,?,?)", (app_id, app_id, '', status, log_path))
+        c.execute(
+            "INSERT INTO apps(id, name, type, status, log_path) VALUES(?,?,?,?,?)",
+            (app_id, name or app_id, app_type or "", status, log_path),
+        )
     conn.commit()
     conn.close()
 
 @app.post("/upload")
-async def upload_app(file: UploadFile = File(...)):
+async def upload_app(name: str = Form(...), file: UploadFile = File(...)):
     """Receive user uploaded app and trigger agent build/run."""
+    # Reject duplicate app names
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE name=?", (name.strip(),))
+    if c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="app name already exists")
+    conn.close()
     app_id = str(uuid.uuid4())
     app_dir = os.path.join(UPLOAD_DIR, app_id)
     os.makedirs(app_dir, exist_ok=True)
@@ -94,7 +108,7 @@ async def upload_app(file: UploadFile = File(...)):
             break
 
     log_path = os.path.join(LOG_DIR, f"{app_id}.log")
-    save_status(app_id, "uploaded", log_path)
+    save_status(app_id, "uploaded", log_path, name=name, app_type=app_type)
 
     # Request agent to run
     try:
