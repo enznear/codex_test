@@ -89,7 +89,11 @@ def save_status(app_id: str, status: str, log_path: str = None, name: str = None
     conn.close()
 
 @app.post("/upload")
-async def upload_app(name: str = Form(...), file: UploadFile = File(...)):
+async def upload_app(
+    file: UploadFile = File(...),
+    allow_ips: str = Form(None),
+    auth_header: str = Form(None),
+):
 
     """Receive user uploaded app and trigger agent build/run."""
     # Reject duplicate app names
@@ -132,7 +136,14 @@ async def upload_app(name: str = Form(...), file: UploadFile = File(...)):
     try:
         resp = requests.post(
             f"{AGENT_URL}/run",
-            json={"app_id": app_id, "path": app_dir, "type": app_type, "log_path": log_path},
+            json={
+                "app_id": app_id,
+                "path": app_dir,
+                "type": app_type,
+                "log_path": log_path,
+                "allow_ips": [ip.strip() for ip in allow_ips.split(",") if ip.strip()] if allow_ips else None,
+                "auth_header": auth_header,
+            },
             timeout=5
         )
         resp.raise_for_status()

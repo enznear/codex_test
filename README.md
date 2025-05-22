@@ -36,8 +36,9 @@ export AGENT_URL=http://localhost:8001  # adjust if agent runs elsewhere
 uvicorn backend.main:app --reload
 ```
 
-### API Endpoints
-- `POST /upload`: upload a zip or project folder.
+- `POST /upload`: upload a zip or project folder. Optional form fields:
+  - `allow_ips`: comma separated list of IPs allowed to access the app.
+  - `auth_header`: header value required for access (sent as `Authorization`).
 - `GET /status`: check running status of apps.
 - `GET /logs/{app_id}`: view logs for an app.
 - `POST /update_status`: (used by agent) update status in the database.
@@ -85,6 +86,24 @@ uvicorn agent.agent:app --port 8001
   Defaults to `http://localhost:8001`.
 - `BACKEND_URL`: URL of the backend API (used by the agent).
   Defaults to `http://localhost:8000`.
+
+## Proxy configuration
+
+The agent writes Nginx configuration to `proxy/apps.conf` using the template
+in `proxy/nginx_template.conf` and reloads Nginx whenever a new app starts.
+Each app is accessible at `/apps/<app_id>/` and proxied to its assigned port.
+```
+server {
+    listen 80;
+    location /apps/<app_id>/ {
+        proxy_pass http://127.0.0.1:<port>/;
+    }
+}
+```
+
+You can restrict access by providing `allow_ips` (comma separated IP list) or an
+`auth_header` when uploading an app. These values are injected into the Nginx
+location block.
 ## Frontend
 
 A minimal React+Tailwind UI is included in `frontend/index.html`. The backend now serves this file automatically, so simply navigate to `http://localhost:8000` in your browser after starting the backend.
