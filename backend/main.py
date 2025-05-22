@@ -10,11 +10,18 @@ import zipfile
 import sqlite3
 import requests
 import re
+import time
+import asyncio
 
 DATABASE = "./app.db"
 UPLOAD_DIR = "./uploads"
 LOG_DIR = "./logs"
 AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8001")
+
+# Port range to allocate for running apps
+PORT_START = int(os.environ.get("PORT_START", 9000))
+PORT_END = int(os.environ.get("PORT_END", 9100))
+AVAILABLE_PORTS = set(range(PORT_START, PORT_END))
 app = FastAPI()
 
 # Serve the React frontend from the same origin
@@ -40,10 +47,19 @@ def init_db():
             status TEXT,
             log_path TEXT,
             port INTEGER,
+            last_heartbeat REAL
             url TEXT
+
         )
         """
     )
+    # Add new columns if database existed before
+    c.execute("PRAGMA table_info(apps)")
+    cols = [row[1] for row in c.fetchall()]
+    if "port" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN port INTEGER")
+    if "last_heartbeat" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN last_heartbeat REAL")
     conn.commit()
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -51,39 +67,54 @@ def init_db():
 
 init_db()
 
-def get_free_port() -> int:
-    """Return an available port between 9000 and 9999."""
+def release_app_port(app_id: str):
+    """Return the port used by the app back to the pool."""
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT port FROM apps WHERE port IS NOT NULL")
-    used = {row[0] for row in c.fetchall()}
+    c.execute("SELECT port FROM apps WHERE id=?", (app_id,))
+    row = c.fetchone()
+    if row and row[0] is not None:
+        AVAILABLE_PORTS.add(row[0])
+        c.execute("UPDATE apps SET port=NULL WHERE id=?", (app_id,))
+        conn.commit()
     conn.close()
-    for port in range(9000, 10000):
-        if port not in used:
-            return port
-    raise RuntimeError("no free ports available")
 
 class StatusUpdate(BaseModel):
     app_id: str
     status: str
 
+class Heartbeat(BaseModel):
+    app_id: str
 
-
-def save_status(app_id: str, status: str, log_path: str = None, name: str = None, app_type: str = None):
+def save_status(app_id: str, status: str = None, log_path: str = None, port: int = None, heartbeat: float = None):
 
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
     exists = c.fetchone()
     if exists:
-        c.execute(
-            "UPDATE apps SET status=?, log_path=? WHERE id=?",
-            (status, log_path, app_id),
-        )
+        fields = []
+        values = []
+        if status is not None:
+            fields.append("status=?")
+            values.append(status)
+        if log_path is not None:
+            fields.append("log_path=?")
+            values.append(log_path)
+        if port is not None:
+            fields.append("port=?")
+            values.append(port)
+        if heartbeat is not None:
+            fields.append("last_heartbeat=?")
+            values.append(heartbeat)
+        if fields:
+            values.append(app_id)
+            c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, type, status, log_path) VALUES(?,?,?,?,?)",
-            (app_id, name or app_id, app_type or "", status, log_path),
+            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat) VALUES(?,?,?,?,?,?,?)",
+            (app_id, app_id, '', status or '', log_path, port, heartbeat),
+
         )
     conn.commit()
     conn.close()
@@ -130,25 +161,25 @@ async def upload_app(
             break
 
     log_path = os.path.join(LOG_DIR, f"{app_id}.log")
-    save_status(app_id, "uploaded", log_path, name=name, app_type=app_type)
+    # Allocate a port for the app
+    if not AVAILABLE_PORTS:
+        raise HTTPException(status_code=503, detail="no available ports")
+    port = AVAILABLE_PORTS.pop()
+    save_status(app_id, "uploaded", log_path, port=port)
+
 
     # Request agent to run
     try:
         resp = requests.post(
             f"{AGENT_URL}/run",
-            json={
-                "app_id": app_id,
-                "path": app_dir,
-                "type": app_type,
-                "log_path": log_path,
-                "allow_ips": [ip.strip() for ip in allow_ips.split(",") if ip.strip()] if allow_ips else None,
-                "auth_header": auth_header,
-            },
+            json={"app_id": app_id, "path": app_dir, "type": app_type, "log_path": log_path, "port": port},
+
             timeout=5
         )
         resp.raise_for_status()
         save_status(app_id, "running", log_path)
     except Exception as e:
+        AVAILABLE_PORTS.add(port)
         save_status(app_id, "error", log_path)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -157,6 +188,14 @@ async def upload_app(
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
     save_status(update.app_id, update.status)
+    if update.status in ("error", "finished"):
+        release_app_port(update.app_id)
+    return {"detail": "ok"}
+
+
+@app.post("/heartbeat")
+async def heartbeat(hb: Heartbeat):
+    save_status(hb.app_id, heartbeat=time.time())
     return {"detail": "ok"}
 
 @app.get("/status")
@@ -176,46 +215,28 @@ async def get_logs(app_id: str):
     with open(log_file) as f:
         return f.read()
 
-@app.post("/stop/{app_id}")
-async def stop_app(app_id: str):
-    """Stop a running app via the agent and update status."""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
-    exists = c.fetchone()
-    conn.close()
-    if not exists:
-        raise HTTPException(status_code=404, detail="app not found")
-    try:
-        resp = requests.post(f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5)
-        resp.raise_for_status()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    save_status(app_id, "stopped")
-    return {"detail": "stopped"}
+async def cleanup_task():
+    """Periodically check for apps without heartbeat and mark them as error."""
+    while True:
+        await asyncio.sleep(30)
+        cutoff = time.time() - 60
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute(
+            "SELECT id FROM apps WHERE status='running' AND (last_heartbeat IS NULL OR last_heartbeat<?)",
+            (cutoff,),
+        )
+        stale = [row[0] for row in c.fetchall()]
+        for app_id in stale:
+            c.execute("UPDATE apps SET status='error' WHERE id=?", (app_id,))
+            conn.commit()
+            release_app_port(app_id)
+        conn.close()
 
-@app.delete("/apps/{app_id}")
-async def delete_app(app_id: str):
-    """Remove uploaded files and logs after ensuring the app is stopped."""
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT status FROM apps WHERE id=?", (app_id,))
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="app not found")
-    status = row[0]
-    if status != "stopped":
-        conn.close()
-        raise HTTPException(status_code=400, detail="app must be stopped first")
-    app_dir = os.path.join(UPLOAD_DIR, app_id)
-    shutil.rmtree(app_dir, ignore_errors=True)
-    log_file = os.path.join(LOG_DIR, f"{app_id}.log")
-    if os.path.exists(log_file):
-        os.remove(log_file)
-    c.execute("DELETE FROM apps WHERE id=?", (app_id,))
-    conn.commit()
-    conn.close()
-    return {"detail": "deleted"}
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(cleanup_task())
+
 
 # Example: run with `uvicorn backend.main:app --reload`
