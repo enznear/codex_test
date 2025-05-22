@@ -4,26 +4,34 @@ from pydantic import BaseModel
 import subprocess
 import os
 import requests
+import asyncio
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 app = FastAPI()
+
+# Track running processes
+PROCESSES = {}
 
 class RunRequest(BaseModel):
     app_id: str
     path: str
     type: str
     log_path: str
+    port: int
 
 
-def run_command(cmd, log_path, wait=True):
+def run_command(cmd, log_path, wait=True, env=None):
     """Run a command and optionally wait for completion."""
+    env_vars = os.environ.copy()
+    if env:
+        env_vars.update(env)
     with open(log_path, "a") as log:
-        process = subprocess.Popen(cmd, stdout=log, stderr=log)
+        process = subprocess.Popen(cmd, stdout=log, stderr=log, env=env_vars)
     if wait:
         process.wait()
         return process.returncode
-    return process.pid
+    return process
 
 @app.post("/run")
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
@@ -36,8 +44,8 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
                 json={"app_id": req.app_id, "status": "error"},
             )
             raise HTTPException(status_code=500, detail="build failed")
-        run_cmd = ["docker", "run", "--rm", "--name", req.app_id, req.app_id]
-        background_tasks.add_task(run_command, run_cmd, req.log_path, False)
+        run_cmd = ["docker", "run", "--rm", "-p", f"{req.port}:{req.port}", "--name", req.app_id, req.app_id]
+        proc = run_command(run_cmd, req.log_path, False, env={"PORT": str(req.port)})
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
         target = py_files[0] if py_files else None
@@ -48,9 +56,38 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
             )
             raise HTTPException(status_code=400, detail="no python file")
         cmd = ["python", os.path.join(req.path, target)]
-        background_tasks.add_task(run_command, cmd, req.log_path, False)
+        proc = run_command(cmd, req.log_path, False, env={"PORT": str(req.port)})
+    PROCESSES[req.app_id] = proc
+    background_tasks.add_task(heartbeat_loop, req.app_id)
     # report running status
     requests.post(f"{BACKEND_URL}/update_status", json={"app_id": req.app_id, "status": "running"})
     return {"detail": "started"}
+
+
+async def heartbeat_loop(app_id: str):
+    """Send periodic heartbeats and detect process exit."""
+    proc = PROCESSES.get(app_id)
+    while proc:
+        if proc.poll() is not None:
+            status = "finished" if proc.returncode == 0 else "error"
+            try:
+                requests.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": app_id, "status": status},
+                    timeout=5,
+                )
+            except Exception:
+                pass
+            PROCESSES.pop(app_id, None)
+            break
+        try:
+            requests.post(
+                f"{BACKEND_URL}/heartbeat",
+                json={"app_id": app_id},
+                timeout=5,
+            )
+        except Exception:
+            pass
+        await asyncio.sleep(5)
 
 # Example: run with `uvicorn agent.agent:app --port 8001`
