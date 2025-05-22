@@ -1,5 +1,5 @@
 """FastAPI backend for MLOps app deployment."""
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -38,7 +38,9 @@ def init_db():
             name TEXT,
             type TEXT,
             status TEXT,
-            log_path TEXT
+            log_path TEXT,
+            port INTEGER,
+            url TEXT
         )
         """
     )
@@ -48,25 +50,44 @@ def init_db():
     os.makedirs(LOG_DIR, exist_ok=True)
 
 init_db()
+
+def get_free_port() -> int:
+    """Return an available port between 9000 and 9999."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT port FROM apps WHERE port IS NOT NULL")
+    used = {row[0] for row in c.fetchall()}
+    conn.close()
+    for port in range(9000, 10000):
+        if port not in used:
+            return port
+    raise RuntimeError("no free ports available")
+
 class StatusUpdate(BaseModel):
     app_id: str
     status: str
 
 
-def save_status(app_id: str, status: str, log_path: str = None):
+def save_status(app_id: str, status: str, log_path: str = None, port: int = None, url: str = None):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
     exists = c.fetchone()
     if exists:
-        c.execute("UPDATE apps SET status=?, log_path=? WHERE id=?", (status, log_path, app_id))
+        c.execute(
+            "UPDATE apps SET status=?, log_path=?, port=COALESCE(?, port), url=COALESCE(?, url) WHERE id=?",
+            (status, log_path, port, url, app_id),
+        )
     else:
-        c.execute("INSERT INTO apps(id, name, type, status, log_path) VALUES(?,?,?,?,?)", (app_id, app_id, '', status, log_path))
+        c.execute(
+            "INSERT INTO apps(id, name, type, status, log_path, port, url) VALUES(?,?,?,?,?,?,?)",
+            (app_id, app_id, '', status, log_path, port, url),
+        )
     conn.commit()
     conn.close()
 
 @app.post("/upload")
-async def upload_app(file: UploadFile = File(...)):
+async def upload_app(request: Request, file: UploadFile = File(...)):
     """Receive user uploaded app and trigger agent build/run."""
     app_id = str(uuid.uuid4())
     app_dir = os.path.join(UPLOAD_DIR, app_id)
@@ -94,7 +115,9 @@ async def upload_app(file: UploadFile = File(...)):
             break
 
     log_path = os.path.join(LOG_DIR, f"{app_id}.log")
-    save_status(app_id, "uploaded", log_path)
+    port = get_free_port()
+    url = f"{request.url.scheme}://{request.url.hostname}:{port}/"
+    save_status(app_id, "uploaded", log_path, port=port, url=url)
 
     # Request agent to run
     try:
@@ -109,7 +132,7 @@ async def upload_app(file: UploadFile = File(...)):
         save_status(app_id, "error", log_path)
         raise HTTPException(status_code=500, detail=str(e))
 
-    return {"app_id": app_id, "status": "running"}
+    return {"app_id": app_id, "status": "running", "url": url}
 
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
@@ -120,10 +143,10 @@ async def update_status(update: StatusUpdate):
 async def get_status():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, status FROM apps")
+    c.execute("SELECT id, status, url FROM apps")
     rows = c.fetchall()
     conn.close()
-    return {row[0]: row[1] for row in rows}
+    return [{"id": row[0], "status": row[1], "url": row[2]} for row in rows]
 
 @app.get("/logs/{app_id}", response_class=PlainTextResponse)
 async def get_logs(app_id: str):
