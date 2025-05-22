@@ -156,4 +156,46 @@ async def get_logs(app_id: str):
     with open(log_file) as f:
         return f.read()
 
+@app.post("/stop/{app_id}")
+async def stop_app(app_id: str):
+    """Stop a running app via the agent and update status."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
+    exists = c.fetchone()
+    conn.close()
+    if not exists:
+        raise HTTPException(status_code=404, detail="app not found")
+    try:
+        resp = requests.post(f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5)
+        resp.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    save_status(app_id, "stopped")
+    return {"detail": "stopped"}
+
+@app.delete("/apps/{app_id}")
+async def delete_app(app_id: str):
+    """Remove uploaded files and logs after ensuring the app is stopped."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT status FROM apps WHERE id=?", (app_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="app not found")
+    status = row[0]
+    if status != "stopped":
+        conn.close()
+        raise HTTPException(status_code=400, detail="app must be stopped first")
+    app_dir = os.path.join(UPLOAD_DIR, app_id)
+    shutil.rmtree(app_dir, ignore_errors=True)
+    log_file = os.path.join(LOG_DIR, f"{app_id}.log")
+    if os.path.exists(log_file):
+        os.remove(log_file)
+    c.execute("DELETE FROM apps WHERE id=?", (app_id,))
+    conn.commit()
+    conn.close()
+    return {"detail": "deleted"}
+
 # Example: run with `uvicorn backend.main:app --reload`
