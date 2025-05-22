@@ -10,7 +10,7 @@ Install the required Python packages:
 ```bash
 pip install -r requirements.txt
 ```
-=======
+
 ## Prerequisites
 
 - Python 3 with the following packages:
