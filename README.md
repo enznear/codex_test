@@ -42,6 +42,7 @@ uvicorn backend.main:app --reload
 - `GET /status`: check running status of apps.
 - `GET /logs/{app_id}`: view logs for an app.
 - `POST /update_status`: (used by agent) update status in the database.
+- `POST /stop`: stop a running app.
 
 ### Uploading Gradio or Docker apps
 
@@ -68,6 +69,8 @@ uvicorn agent.agent:app --port 8001
 ```
 
 The agent builds and runs Docker or Gradio apps and reports status back to the backend.
+
+The backend specifies a port for each app which the agent forwards to Docker or sets as `GRADIO_SERVER_PORT` for Gradio scripts.
 
 Example setup:
 

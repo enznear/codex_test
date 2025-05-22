@@ -1,16 +1,22 @@
 """Simple agent running on GPU server to build/run apps."""
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import subprocess
 import os
 import requests
 from typing import List, Optional
-
 from proxy.proxy import add_route
+import threading
+import time
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
+# store running processes keyed by app_id
+processes = {}
+
 app = FastAPI()
+
+PROCESSES = {}
 
 class RunRequest(BaseModel):
     app_id: str
@@ -19,7 +25,15 @@ class RunRequest(BaseModel):
     log_path: str
     allow_ips: Optional[List[str]] = None
     auth_header: Optional[str] = None
+    port: int
 
+
+
+class StopRequest(BaseModel):
+    app_id: str
+
+class StopRequest(BaseModel):
+    app_id: str
 
 def run_command(cmd, log_path, wait=True, env=None):
     """Run a command and optionally wait for completion."""
@@ -28,7 +42,7 @@ def run_command(cmd, log_path, wait=True, env=None):
     if wait:
         process.wait()
         return process.returncode
-    return process.pid
+    return process
 
 @app.post("/run")
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
@@ -54,6 +68,7 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
             req.app_id,
         ]
         background_tasks.add_task(run_command, run_cmd, req.log_path, False)
+
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
         target = py_files[0] if py_files else None
@@ -69,6 +84,19 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
         background_tasks.add_task(run_command, cmd, req.log_path, False, env=env)
     # report running status
     requests.post(f"{BACKEND_URL}/update_status", json={"app_id": req.app_id, "status": "running"})
+
     return {"detail": "started"}
+
+
+@app.post("/stop")
+async def stop_app(req: StopRequest):
+    info = processes.get(req.app_id)
+    if not info:
+        raise HTTPException(status_code=404, detail="app not running")
+    if info["type"] == "docker":
+        subprocess.run(["docker", "stop", req.app_id])
+    else:
+        info["process"].terminate()
+    return {"detail": "stopping"}
 
 # Example: run with `uvicorn agent.agent:app --port 8001`
