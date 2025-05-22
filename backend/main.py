@@ -1,6 +1,7 @@
 """FastAPI backend for MLOps app deployment."""
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import shutil
 import os
@@ -15,6 +16,14 @@ UPLOAD_DIR = "./uploads"
 LOG_DIR = "./logs"
 AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8001")
 app = FastAPI()
+
+# Serve the React frontend from the same origin
+app.mount("/static", StaticFiles(directory="frontend"), name="frontend")
+
+@app.get("/", include_in_schema=False)
+async def frontend_index():
+    """Return the frontend single-page app."""
+    return FileResponse("frontend/index.html")
 
 # Allowed pattern for uploaded filenames
 ALLOWED_FILENAME = re.compile(r"^[A-Za-z0-9._-]+$")

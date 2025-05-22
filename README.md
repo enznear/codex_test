@@ -49,7 +49,7 @@ uvicorn backend.main:app --reload
    - **Docker**: include a `Dockerfile` in the uploaded directory or archive. If a `Dockerfile` is present the backend treats the app as a Docker project and builds it with `docker build`.
 
 2. **Send a request**
-   - Via the frontend: open `frontend/index.html` in a browser and select a file to upload.
+  - Via the frontend: open `http://localhost:8000` in a browser and select a file to upload.
    - Via `curl`:
 
      ```bash
@@ -84,10 +84,4 @@ uvicorn agent.agent:app --port 8001
   Defaults to `http://localhost:8000`.
 ## Frontend
 
-A minimal React+Tailwind UI is available in `frontend/index.html`. It can be served using any static file server. For example:
-
-```bash
-python -m http.server 3000 --directory frontend
-```
-
-Then open `http://localhost:3000` in your browser.
+A minimal React+Tailwind UI is included in `frontend/index.html`. The backend now serves this file automatically, so simply navigate to `http://localhost:8000` in your browser after starting the backend.
