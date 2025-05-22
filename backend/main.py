@@ -1,0 +1,120 @@
+"""FastAPI backend for MLOps app deployment."""
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
+import shutil
+import os
+import uuid
+import zipfile
+import sqlite3
+import requests
+
+DATABASE = "./app.db"
+UPLOAD_DIR = "./uploads"
+LOG_DIR = "./logs"
+AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8001")
+app = FastAPI()
+
+def init_db():
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS apps (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            type TEXT,
+            status TEXT,
+            log_path TEXT
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+init_db()
+class StatusUpdate(BaseModel):
+    app_id: str
+    status: str
+
+
+def save_status(app_id: str, status: str, log_path: str = None):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
+    exists = c.fetchone()
+    if exists:
+        c.execute("UPDATE apps SET status=?, log_path=? WHERE id=?", (status, log_path, app_id))
+    else:
+        c.execute("INSERT INTO apps(id, name, type, status, log_path) VALUES(?,?,?,?,?)", (app_id, app_id, '', status, log_path))
+    conn.commit()
+    conn.close()
+
+@app.post("/upload")
+async def upload_app(file: UploadFile = File(...)):
+    """Receive user uploaded app and trigger agent build/run."""
+    app_id = str(uuid.uuid4())
+    app_dir = os.path.join(UPLOAD_DIR, app_id)
+    os.makedirs(app_dir, exist_ok=True)
+    file_location = os.path.join(app_dir, file.filename)
+    with open(file_location, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    # If zip file, extract
+    if zipfile.is_zipfile(file_location):
+        with zipfile.ZipFile(file_location, 'r') as z:
+            z.extractall(app_dir)
+
+    # Detect app type
+    app_type = "gradio"
+    for root, _, files in os.walk(app_dir):
+        for name in files:
+            if name.lower() == "dockerfile":
+                app_type = "docker"
+                break
+        if app_type == "docker":
+            break
+
+    log_path = os.path.join(LOG_DIR, f"{app_id}.log")
+    save_status(app_id, "uploaded", log_path)
+
+    # Request agent to run
+    try:
+        resp = requests.post(
+            f"{AGENT_URL}/run",
+            json={"app_id": app_id, "path": app_dir, "type": app_type, "log_path": log_path},
+            timeout=5
+        )
+        resp.raise_for_status()
+        save_status(app_id, "running", log_path)
+    except Exception as e:
+        save_status(app_id, "error", log_path)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"app_id": app_id, "status": "running"}
+
+@app.post("/update_status")
+async def update_status(update: StatusUpdate):
+    save_status(update.app_id, update.status)
+    return {"detail": "ok"}
+
+@app.get("/status")
+async def get_status():
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id, status FROM apps")
+    rows = c.fetchall()
+    conn.close()
+    return {row[0]: row[1] for row in rows}
+
+@app.get("/logs/{app_id}", response_class=PlainTextResponse)
+async def get_logs(app_id: str):
+    log_file = os.path.join(LOG_DIR, f"{app_id}.log")
+    if not os.path.exists(log_file):
+        raise HTTPException(status_code=404, detail="log not found")
+    with open(log_file) as f:
+        return f.read()
+
+# Example: run with `uvicorn backend.main:app --reload`
