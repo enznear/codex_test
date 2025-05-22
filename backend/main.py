@@ -1,5 +1,5 @@
 """FastAPI backend for MLOps app deployment."""
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -48,6 +48,8 @@ def init_db():
             log_path TEXT,
             port INTEGER,
             last_heartbeat REAL
+            url TEXT
+
         )
         """
     )
@@ -76,6 +78,7 @@ def release_app_port(app_id: str):
         c.execute("UPDATE apps SET port=NULL WHERE id=?", (app_id,))
         conn.commit()
     conn.close()
+
 class StatusUpdate(BaseModel):
     app_id: str
     status: str
@@ -83,8 +86,8 @@ class StatusUpdate(BaseModel):
 class Heartbeat(BaseModel):
     app_id: str
 
-
 def save_status(app_id: str, status: str = None, log_path: str = None, port: int = None, heartbeat: float = None):
+
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
@@ -111,13 +114,27 @@ def save_status(app_id: str, status: str = None, log_path: str = None, port: int
         c.execute(
             "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat) VALUES(?,?,?,?,?,?,?)",
             (app_id, app_id, '', status or '', log_path, port, heartbeat),
+
         )
     conn.commit()
     conn.close()
 
 @app.post("/upload")
-async def upload_app(file: UploadFile = File(...)):
+async def upload_app(
+    file: UploadFile = File(...),
+    allow_ips: str = Form(None),
+    auth_header: str = Form(None),
+):
+
     """Receive user uploaded app and trigger agent build/run."""
+    # Reject duplicate app names
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE name=?", (name.strip(),))
+    if c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="app name already exists")
+    conn.close()
     app_id = str(uuid.uuid4())
     app_dir = os.path.join(UPLOAD_DIR, app_id)
     os.makedirs(app_dir, exist_ok=True)
@@ -150,11 +167,13 @@ async def upload_app(file: UploadFile = File(...)):
     port = AVAILABLE_PORTS.pop()
     save_status(app_id, "uploaded", log_path, port=port)
 
+
     # Request agent to run
     try:
         resp = requests.post(
             f"{AGENT_URL}/run",
             json={"app_id": app_id, "path": app_dir, "type": app_type, "log_path": log_path, "port": port},
+
             timeout=5
         )
         resp.raise_for_status()
@@ -164,7 +183,7 @@ async def upload_app(file: UploadFile = File(...)):
         save_status(app_id, "error", log_path)
         raise HTTPException(status_code=500, detail=str(e))
 
-    return {"app_id": app_id, "status": "running"}
+    return {"app_id": app_id, "status": "running", "url": url}
 
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
@@ -183,10 +202,10 @@ async def heartbeat(hb: Heartbeat):
 async def get_status():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, status FROM apps")
+    c.execute("SELECT id, status, url FROM apps")
     rows = c.fetchall()
     conn.close()
-    return {row[0]: row[1] for row in rows}
+    return [{"id": row[0], "status": row[1], "url": row[2]} for row in rows]
 
 @app.get("/logs/{app_id}", response_class=PlainTextResponse)
 async def get_logs(app_id: str):
@@ -195,7 +214,6 @@ async def get_logs(app_id: str):
         raise HTTPException(status_code=404, detail="log not found")
     with open(log_file) as f:
         return f.read()
-
 
 async def cleanup_task():
     """Periodically check for apps without heartbeat and mark them as error."""
@@ -219,5 +237,6 @@ async def cleanup_task():
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(cleanup_task())
+
 
 # Example: run with `uvicorn backend.main:app --reload`
