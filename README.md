@@ -2,6 +2,15 @@
 
 This repository contains a sample FastAPI backend and agent for deploying user uploaded Gradio or Docker apps on a GPU server.
 
+
+## Setup
+
+Install the required Python packages:
+
+```bash
+pip install -r requirements.txt
+```
+=======
 ## Prerequisites
 
 - Python 3 with the following packages:
@@ -9,6 +18,7 @@ This repository contains a sample FastAPI backend and agent for deploying user u
   - `uvicorn`
   - `requests`
 - Docker installed and running
+
 
 ## Backend
 
