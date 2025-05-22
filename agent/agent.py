@@ -14,6 +14,8 @@ processes = {}
 
 app = FastAPI()
 
+PROCESSES = {}
+
 class RunRequest(BaseModel):
     app_id: str
     path: str
@@ -21,6 +23,9 @@ class RunRequest(BaseModel):
     log_path: str
     port: int
 
+
+class StopRequest(BaseModel):
+    app_id: str
 
 class StopRequest(BaseModel):
     app_id: str
