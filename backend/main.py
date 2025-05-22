@@ -8,12 +8,16 @@ import uuid
 import zipfile
 import sqlite3
 import requests
+import re
 
 DATABASE = "./app.db"
 UPLOAD_DIR = "./uploads"
 LOG_DIR = "./logs"
 AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8001")
 app = FastAPI()
+
+# Allowed pattern for uploaded filenames
+ALLOWED_FILENAME = re.compile(r"^[A-Za-z0-9._-]+$")
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
@@ -58,7 +62,10 @@ async def upload_app(file: UploadFile = File(...)):
     app_id = str(uuid.uuid4())
     app_dir = os.path.join(UPLOAD_DIR, app_id)
     os.makedirs(app_dir, exist_ok=True)
-    file_location = os.path.join(app_dir, file.filename)
+    filename = os.path.basename(file.filename)
+    if not ALLOWED_FILENAME.fullmatch(filename):
+        raise HTTPException(status_code=400, detail="invalid filename")
+    file_location = os.path.join(app_dir, filename)
     with open(file_location, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
