@@ -199,12 +199,31 @@ async def upload_app(
     try:
         resp = requests.post(
             f"{AGENT_URL}/run",
-            json={"app_id": app_id, "path": app_dir, "type": app_type, "log_path": log_path, "port": port},
-
-            timeout=5
+            json={
+                "app_id": app_id,
+                "path": app_dir,
+                "type": app_type,
+                "log_path": log_path,
+                "port": port,
+            },
+            timeout=5,
         )
         resp.raise_for_status()
         save_status(app_id, "running", log_path)
+    except requests.exceptions.ConnectionError:
+        AVAILABLE_PORTS.add(port)
+        save_status(app_id, "error", log_path)
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to reach agent. Please ensure the agent is running and reachable.",
+        )
+    except requests.exceptions.Timeout:
+        AVAILABLE_PORTS.add(port)
+        save_status(app_id, "error", log_path)
+        raise HTTPException(
+            status_code=504,
+            detail="Agent request timed out. Please make sure the agent is running.",
+        )
     except Exception as e:
         AVAILABLE_PORTS.add(port)
         save_status(app_id, "error", log_path)
