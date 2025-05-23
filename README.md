@@ -90,19 +90,22 @@ uvicorn agent.agent:app --port 8001
   Defaults to `http://localhost:8001`.
 - `BACKEND_URL`: URL of the backend API (used by the agent).
   Defaults to `http://localhost:8000`.
+- `PROXY_LINK_PATH`: path where the agent attempts to symlink the generated
+  Nginx config so it is loaded automatically. Defaults to
+  `/etc/nginx/conf.d/apps.conf`.
 
 ## Proxy configuration
 
 The agent writes Nginx configuration to `proxy/apps.conf` using the template
 in `proxy/nginx_template.conf` and reloads Nginx whenever a new app starts.
-Copy or symlink this file to a directory that Nginx includes (for example
-`/etc/nginx/conf.d/apps.conf`), or run the agent with
-`PROXY_CONFIG_PATH=/etc/nginx/conf.d/apps.conf` so Nginx picks up the
-generated config. After writing the file, reload or restart Nginx with
-`sudo nginx -s reload` (or `sudo systemctl reload nginx`). Without this step
-requests fall back to the backend and return "Method Not Allowed." Each app is
-accessible via `http://<server>/apps/<app_id>/` (port 80) and proxied to its
-assigned port.
+The proxy module now tries to create a symlink to this file at the location
+specified by `PROXY_LINK_PATH` (defaults to `/etc/nginx/conf.d/apps.conf`).
+If the symlink is created successfully, Nginx will automatically pick up the
+generated config. You can also set `PROXY_CONFIG_PATH` to write directly to the
+Nginx directory. After writing the file, the agent calls `nginx -s reload` to
+apply the changes. Without this step requests fall back to the backend and
+return "Method Not Allowed." Each app is accessible via
+`http://<server>/apps/<app_id>/` (port 80) and proxied to its assigned port.
 ```
 server {
     listen 80;
