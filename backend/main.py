@@ -86,7 +86,14 @@ class StatusUpdate(BaseModel):
 class Heartbeat(BaseModel):
     app_id: str
 
-def save_status(app_id: str, status: str = None, log_path: str = None, port: int = None, heartbeat: float = None):
+def save_status(
+    app_id: str,
+    status: str = None,
+    log_path: str = None,
+    port: int = None,
+    heartbeat: float = None,
+    name: str = None,
+):
 
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
@@ -107,13 +114,16 @@ def save_status(app_id: str, status: str = None, log_path: str = None, port: int
         if heartbeat is not None:
             fields.append("last_heartbeat=?")
             values.append(heartbeat)
+        if name is not None:
+            fields.append("name=?")
+            values.append(name)
         if fields:
             values.append(app_id)
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
             "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat) VALUES(?,?,?,?,?,?,?)",
-            (app_id, app_id, '', status or '', log_path, port, heartbeat),
+            (app_id, name or app_id, '', status or '', log_path, port, heartbeat),
 
         )
     conn.commit()
@@ -121,6 +131,7 @@ def save_status(app_id: str, status: str = None, log_path: str = None, port: int
 
 @app.post("/upload")
 async def upload_app(
+    name: str = Form(...),
     file: UploadFile = File(...),
     allow_ips: str = Form(None),
     auth_header: str = Form(None),
@@ -153,8 +164,8 @@ async def upload_app(
     # Detect app type
     app_type = "gradio"
     for root, _, files in os.walk(app_dir):
-        for name in files:
-            if name.lower() == "dockerfile":
+        for fname in files:
+            if fname.lower() == "dockerfile":
                 app_type = "docker"
                 break
         if app_type == "docker":
@@ -165,7 +176,7 @@ async def upload_app(
     if not AVAILABLE_PORTS:
         raise HTTPException(status_code=503, detail="no available ports")
     port = AVAILABLE_PORTS.pop()
-    save_status(app_id, "uploaded", log_path, port=port)
+    save_status(app_id, "uploaded", log_path, port=port, name=name.strip())
 
 
     # Request agent to run
