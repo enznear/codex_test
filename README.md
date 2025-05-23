@@ -36,9 +36,10 @@ export AGENT_URL=http://localhost:8001  # adjust if agent runs elsewhere
 uvicorn backend.main:app --reload
 ```
 
-- `POST /upload`: upload a zip or project folder. Optional form fields:
-  - `allow_ips`: comma separated list of IPs allowed to access the app.
-  - `auth_header`: header value required for access (sent as `Authorization`).
+- `POST /upload`: upload a zip or project folder.
+  - `name`: app name used for duplicate checks.
+  - `allow_ips`: comma separated list of IPs allowed to access the app (optional).
+  - `auth_header`: header value required for access (sent as `Authorization`, optional).
 - `GET /status`: check running status of apps.
 - `GET /logs/{app_id}`: view logs for an app.
 - `POST /update_status`: (used by agent) update status in the database.
