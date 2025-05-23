@@ -87,6 +87,9 @@ class StatusUpdate(BaseModel):
 class Heartbeat(BaseModel):
     app_id: str
 
+class StopRequest(BaseModel):
+    app_id: str
+
 def save_status(
     app_id: str,
     status: str = None,
@@ -221,6 +224,23 @@ async def update_status(update: StatusUpdate):
 async def heartbeat(hb: Heartbeat):
     save_status(hb.app_id, heartbeat=time.time())
     return {"detail": "ok"}
+
+
+@app.post("/stop")
+async def stop_app(req: StopRequest):
+    try:
+        resp = requests.post(
+            f"{AGENT_URL}/stop",
+            json={"app_id": req.app_id},
+            timeout=5,
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    save_status(req.app_id, "finished")
+    release_app_port(req.app_id)
+    return {"detail": "stopped"}
 
 @app.get("/status")
 async def get_status():
