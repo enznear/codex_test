@@ -86,27 +86,6 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     return {"detail": "started"}
 
 
-@app.post("/stop")
-async def stop_app(req: StopRequest):
-    proc = PROCESSES.get(req.app_id)
-    if not proc:
-        raise HTTPException(status_code=404, detail="app not running")
-    proc.terminate()
-    try:
-        proc.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-    PROCESSES.pop(req.app_id, None)
-    remove_route(req.app_id)
-    try:
-        requests.post(
-            f"{BACKEND_URL}/update_status",
-            json={"app_id": req.app_id, "status": "finished"},
-            timeout=5,
-        )
-    except Exception:
-        pass
-    return {"detail": "stopped"}
 
 async def heartbeat_loop(app_id: str):
     """Send periodic heartbeats and detect process exit."""
@@ -145,7 +124,9 @@ async def stop_app(req: StopRequest):
     try:
         proc.terminate()
         try:
-            proc.wait(timeout=5)
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
         except Exception:
             proc.kill()
     except Exception:
