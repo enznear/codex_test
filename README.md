@@ -18,6 +18,7 @@ pip install -r requirements.txt
   - `uvicorn`
   - `requests`
 - Docker installed and running
+- Nginx installed and available in `PATH` (e.g., `apt-get install nginx`)
 
 
 ## Backend
