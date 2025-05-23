@@ -101,6 +101,8 @@ async def heartbeat_loop(app_id: str):
                 )
             except Exception:
                 pass
+            # Clean up Nginx routing for this app
+            remove_route(app_id)
             PROCESSES.pop(app_id, None)
             break
         try:
