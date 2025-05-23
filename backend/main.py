@@ -47,9 +47,8 @@ def init_db():
             status TEXT,
             log_path TEXT,
             port INTEGER,
-            last_heartbeat REAL
+            last_heartbeat REAL,
             url TEXT
-
         )
         """
     )
@@ -60,6 +59,8 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN port INTEGER")
     if "last_heartbeat" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN last_heartbeat REAL")
+    if "url" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN url TEXT")
     conn.commit()
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -93,6 +94,7 @@ def save_status(
     port: int = None,
     heartbeat: float = None,
     name: str = None,
+    url: str = None,
 ):
 
     conn = sqlite3.connect(DATABASE)
@@ -117,13 +119,16 @@ def save_status(
         if name is not None:
             fields.append("name=?")
             values.append(name)
+        if url is not None:
+            fields.append("url=?")
+            values.append(url)
         if fields:
             values.append(app_id)
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat) VALUES(?,?,?,?,?,?,?)",
-            (app_id, name or app_id, '', status or '', log_path, port, heartbeat),
+            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url) VALUES(?,?,?,?,?,?,?,?)",
+            (app_id, name or app_id, '', status or '', log_path, port, heartbeat, url),
 
         )
     conn.commit()
@@ -176,7 +181,8 @@ async def upload_app(
     if not AVAILABLE_PORTS:
         raise HTTPException(status_code=503, detail="no available ports")
     port = AVAILABLE_PORTS.pop()
-    save_status(app_id, "uploaded", log_path, port=port, name=name.strip())
+    url = f"/apps/{app_id}/"
+    save_status(app_id, "uploaded", log_path, port=port, name=name.strip(), url=url)
 
 
     # Request agent to run
@@ -216,7 +222,10 @@ async def get_status():
     c.execute("SELECT id, status, url FROM apps")
     rows = c.fetchall()
     conn.close()
-    return [{"id": row[0], "status": row[1], "url": row[2]} for row in rows]
+    return [
+        {"id": row[0], "status": row[1], "url": row[2] or f"/apps/{row[0]}/"}
+        for row in rows
+    ]
 
 @app.get("/logs/{app_id}", response_class=PlainTextResponse)
 async def get_logs(app_id: str):
