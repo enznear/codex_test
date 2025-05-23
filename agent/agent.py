@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import subprocess
 import os
+import sys
 import requests
 import asyncio
 from typing import List, Optional
@@ -74,7 +75,7 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
                 json={"app_id": req.app_id, "status": "error"},
             )
             raise HTTPException(status_code=400, detail="no python file")
-        cmd = ["python", os.path.join(req.path, target)]
+        cmd = [sys.executable, os.path.join(req.path, target)]
         proc = run_command(cmd, req.log_path, False, env={"PORT": str(req.port)})
     PROCESSES[req.app_id] = proc
     background_tasks.add_task(heartbeat_loop, req.app_id)
