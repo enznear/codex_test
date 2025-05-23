@@ -3,10 +3,32 @@ import json
 import subprocess
 import logging
 
-ROUTES_FILE = os.environ.get("ROUTES_FILE", os.path.join(os.path.dirname(__file__), "routes.json"))
+ROUTES_FILE = os.environ.get(
+    "ROUTES_FILE", os.path.join(os.path.dirname(__file__), "routes.json")
+)
 CONFIG_PATH = os.environ.get(
     "PROXY_CONFIG_PATH", os.path.join(os.path.dirname(__file__), "apps.conf")
 )
+# Path where nginx will read the config; defaults to /etc/nginx/conf.d/apps.conf
+LINK_PATH = os.environ.get("PROXY_LINK_PATH", "/etc/nginx/conf.d/apps.conf")
+
+
+def ensure_link():
+    """Create or update symlink for Nginx to load the generated config."""
+    if CONFIG_PATH == LINK_PATH:
+        return
+    try:
+        if os.path.islink(LINK_PATH):
+            current = os.readlink(LINK_PATH)
+            if current != CONFIG_PATH:
+                os.unlink(LINK_PATH)
+                os.symlink(CONFIG_PATH, LINK_PATH)
+        else:
+            if os.path.exists(LINK_PATH):
+                os.unlink(LINK_PATH)
+            os.symlink(CONFIG_PATH, LINK_PATH)
+    except PermissionError:
+        logging.warning("Permission denied creating Nginx config link")
 
 
 def load_routes():
@@ -41,6 +63,7 @@ def generate_config(routes):
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         f.write("\n".join(lines))
+    ensure_link()
 
 
 def reload_proxy():
