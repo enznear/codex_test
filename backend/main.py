@@ -262,6 +262,64 @@ async def get_logs(app_id: str):
     with open(log_file) as f:
         return f.read()
 
+
+@app.post("/stop/{app_id}")
+async def stop_app(app_id: str):
+    """Stop a running app via the agent and mark it stopped."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE id=?", (app_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="app not found")
+    conn.close()
+
+    # Notify the agent
+    try:
+        requests.post(f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    save_status(app_id, "stopped")
+    release_app_port(app_id)
+    return {"detail": "stopped"}
+
+
+@app.delete("/apps/{app_id}")
+async def delete_app(app_id: str):
+    """Delete an app and all its data."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT status FROM apps WHERE id=?", (app_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="app not found")
+    status = row[0]
+    conn.close()
+
+    if status == "running":
+        try:
+            requests.post(f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5)
+        except Exception:
+            pass
+
+    release_app_port(app_id)
+
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("DELETE FROM apps WHERE id=?", (app_id,))
+    conn.commit()
+    conn.close()
+
+    shutil.rmtree(os.path.join(UPLOAD_DIR, app_id), ignore_errors=True)
+    log_file = os.path.join(LOG_DIR, f"{app_id}.log")
+    if os.path.exists(log_file):
+        os.remove(log_file)
+
+    return {"detail": "deleted"}
+
 async def cleanup_task():
     """Periodically check for apps without heartbeat and mark them as error."""
     while True:

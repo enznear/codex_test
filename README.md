@@ -44,7 +44,8 @@ uvicorn backend.main:app --reload
 - `GET /status`: check running status of apps.
 - `GET /logs/{app_id}`: view logs for an app.
 - `POST /update_status`: (used by agent) update status in the database.
-- `POST /stop`: stop a running app.
+- `POST /stop/{app_id}`: stop a running app.
+- `DELETE /apps/{app_id}`: remove an app and all associated files.
 
 ### Uploading Gradio or Docker apps
 

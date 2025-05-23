@@ -135,4 +135,40 @@ async def heartbeat_loop(app_id: str):
         await asyncio.sleep(5)
 
 
+@app.post("/stop")
+async def stop_app(req: StopRequest):
+    """Stop a running app process."""
+    proc = PROCESSES.get(req.app_id)
+    if not proc:
+        raise HTTPException(status_code=404, detail="app not running")
+
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()
+    except Exception:
+        pass
+
+    PROCESSES.pop(req.app_id, None)
+
+    # Best effort stop docker container if one was started
+    subprocess.run(["docker", "stop", req.app_id], check=False)
+
+    # Remove proxy route and notify backend
+    remove_route(req.app_id)
+
+    try:
+        requests.post(
+            f"{BACKEND_URL}/update_status",
+            json={"app_id": req.app_id, "status": "finished"},
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+    return {"detail": "stopped"}
+
+
 # Example: run with `uvicorn agent.agent:app --port 8001`
