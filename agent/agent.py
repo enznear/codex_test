@@ -51,8 +51,8 @@ def run_command(cmd, log_path, wait=True, env=None):
 
 @app.post("/run")
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
-    # allocate a port and configure the proxy
-    port = add_route(req.app_id, req.allow_ips, req.auth_header)
+    # configure the proxy for the assigned port
+    add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
     if req.type == "docker":
         build_cmd = ["docker", "build", "-t", req.app_id, req.path]
         ret = run_command(build_cmd, req.log_path)
