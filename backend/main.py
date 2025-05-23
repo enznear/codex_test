@@ -161,9 +161,16 @@ async def upload_app(
     with open(file_location, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # If zip file, extract
+    # If zip file, extract safely
     if zipfile.is_zipfile(file_location):
-        with zipfile.ZipFile(file_location, 'r') as z:
+        with zipfile.ZipFile(file_location, "r") as z:
+            for member in z.namelist():
+                # Reject absolute paths or traversals
+                if os.path.isabs(member) or ".." in member.split("/"):
+                    raise HTTPException(status_code=400, detail="invalid zip entry path")
+                resolved = os.path.realpath(os.path.join(app_dir, member))
+                if not resolved.startswith(os.path.realpath(app_dir) + os.sep):
+                    raise HTTPException(status_code=400, detail="zip entry outside app directory")
             z.extractall(app_dir)
 
     # Detect app type
