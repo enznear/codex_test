@@ -36,6 +36,9 @@ class RunRequest(BaseModel):
 class StopRequest(BaseModel):
     app_id: str
 
+class RemoveRouteRequest(BaseModel):
+    app_id: str
+
 def run_command(cmd, log_path, wait=True, env=None):
     """Run a command and optionally wait for completion."""
     env_vars = os.environ.copy()
@@ -150,6 +153,13 @@ async def stop_app(req: StopRequest):
         pass
 
     return {"detail": "stopped"}
+
+
+@app.post("/remove_route")
+async def remove_route_endpoint(req: RemoveRouteRequest):
+    """Remove an app's proxy route regardless of process state."""
+    remove_route(req.app_id)
+    return {"detail": "removed"}
 
 
 # Example: run with `uvicorn agent.agent:app --port 8001`

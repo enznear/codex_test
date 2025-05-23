@@ -320,7 +320,17 @@ async def delete_app(app_id: str):
 
     if status == "running":
         try:
-            requests.post(f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5)
+            requests.post(
+                f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5
+            )
+        except Exception:
+            pass
+    else:
+        # Ensure the proxy route is removed for non-running apps
+        try:
+            requests.post(
+                f"{AGENT_URL}/remove_route", json={"app_id": app_id}, timeout=5
+            )
         except Exception:
             pass
 
