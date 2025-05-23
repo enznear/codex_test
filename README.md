@@ -95,7 +95,14 @@ uvicorn agent.agent:app --port 8001
 
 The agent writes Nginx configuration to `proxy/apps.conf` using the template
 in `proxy/nginx_template.conf` and reloads Nginx whenever a new app starts.
-Each app is accessible at `/apps/<app_id>/` and proxied to its assigned port.
+Copy or symlink this file to a directory that Nginx includes (for example
+`/etc/nginx/conf.d/apps.conf`), or run the agent with
+`PROXY_CONFIG_PATH=/etc/nginx/conf.d/apps.conf` so Nginx picks up the
+generated config. After writing the file, reload or restart Nginx with
+`sudo nginx -s reload` (or `sudo systemctl reload nginx`). Without this step
+requests fall back to the backend and return "Method Not Allowed." Each app is
+accessible via `http://<server>/apps/<app_id>/` (port 80) and proxied to its
+assigned port.
 ```
 server {
     listen 80;
