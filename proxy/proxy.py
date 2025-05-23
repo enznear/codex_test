@@ -70,3 +70,13 @@ def add_route(app_id, allow_ips=None, auth_header=None):
     generate_config(routes)
     reload_proxy()
     return port
+
+
+def remove_route(app_id):
+    """Remove an app's route and reload the proxy."""
+    routes = load_routes()
+    if app_id in routes:
+        routes.pop(app_id)
+        save_routes(routes)
+        generate_config(routes)
+        reload_proxy()
