@@ -4,8 +4,9 @@ import subprocess
 import logging
 
 ROUTES_FILE = os.environ.get("ROUTES_FILE", os.path.join(os.path.dirname(__file__), "routes.json"))
-CONFIG_PATH = os.environ.get("PROXY_CONFIG_PATH", os.path.join(os.path.dirname(__file__), "apps.conf"))
-BASE_PORT = int(os.environ.get("APP_BASE_PORT", "10000"))
+CONFIG_PATH = os.environ.get(
+    "PROXY_CONFIG_PATH", os.path.join(os.path.dirname(__file__), "apps.conf")
+)
 
 
 def load_routes():
@@ -21,12 +22,6 @@ def save_routes(routes):
         json.dump(routes, f)
 
 
-def allocate_port(routes):
-    used = {info["port"] for info in routes.values()}
-    port = BASE_PORT
-    while port in used:
-        port += 1
-    return port
 
 
 def generate_config(routes):
@@ -55,12 +50,8 @@ def reload_proxy():
         logging.warning("Nginx not installed; skipping reload")
 
 
-def add_route(app_id, allow_ips=None, auth_header=None):
+def add_route(app_id, port, allow_ips=None, auth_header=None):
     routes = load_routes()
-    if app_id in routes:
-        port = routes[app_id]["port"]
-    else:
-        port = allocate_port(routes)
     routes[app_id] = {"port": port}
     if allow_ips:
         routes[app_id]["allow_ips"] = allow_ips
