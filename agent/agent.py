@@ -1,5 +1,5 @@
 """Simple agent running on GPU server to build/run apps."""
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import subprocess
 import os
@@ -31,9 +31,6 @@ class RunRequest(BaseModel):
     port: int
 
 
-
-class StopRequest(BaseModel):
-    app_id: str
 
 class StopRequest(BaseModel):
     app_id: str
