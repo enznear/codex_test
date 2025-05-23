@@ -1,6 +1,7 @@
 import os
 import json
 import subprocess
+import logging
 
 ROUTES_FILE = os.environ.get("ROUTES_FILE", os.path.join(os.path.dirname(__file__), "routes.json"))
 CONFIG_PATH = os.environ.get("PROXY_CONFIG_PATH", os.path.join(os.path.dirname(__file__), "apps.conf"))
@@ -48,7 +49,10 @@ def generate_config(routes):
 
 
 def reload_proxy():
-    subprocess.run(["nginx", "-s", "reload"], check=False)
+    try:
+        subprocess.run(["nginx", "-s", "reload"], check=False)
+    except FileNotFoundError:
+        logging.warning("Nginx not installed; skipping reload")
 
 
 def add_route(app_id, allow_ips=None, auth_header=None):
