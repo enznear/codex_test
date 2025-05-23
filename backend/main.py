@@ -146,6 +146,7 @@ async def upload_app(
 ):
 
     """Receive user uploaded app and trigger agent build/run."""
+    allowed = [ip.strip() for ip in allow_ips.split(',')] if allow_ips else None
     # Reject duplicate app names
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
@@ -205,6 +206,8 @@ async def upload_app(
                 "type": app_type,
                 "log_path": log_path,
                 "port": port,
+                "allow_ips": allowed,
+                "auth_header": auth_header,
             },
             timeout=5,
         )
