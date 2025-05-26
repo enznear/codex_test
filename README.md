@@ -16,7 +16,7 @@ pip install -r requirements.txt
 - Python 3 with the following packages:
   - `fastapi`
   - `uvicorn`
-  - `requests`
+  - `httpx`
 - Docker installed and running
 - Nginx installed and available in `PATH` (e.g., `apt-get install nginx`)
 
@@ -32,7 +32,7 @@ uvicorn backend.main:app --reload
 Example setup:
 
 ```bash
-pip install fastapi uvicorn requests
+pip install fastapi uvicorn httpx
 export AGENT_URL=http://localhost:8001  # adjust if agent runs elsewhere
 uvicorn backend.main:app --reload
 ```
@@ -79,7 +79,7 @@ The backend specifies a port for each app which the agent forwards to Docker or 
 Example setup:
 
 ```bash
-pip install fastapi uvicorn requests
+pip install fastapi uvicorn httpx
 export BACKEND_URL=http://localhost:8000  # adjust if backend runs elsewhere
 uvicorn agent.agent:app --port 8001
 ```

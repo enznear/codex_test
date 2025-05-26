@@ -8,7 +8,7 @@ import os
 import uuid
 import zipfile
 import sqlite3
-import requests
+import httpx
 import re
 import time
 import asyncio
@@ -198,29 +198,30 @@ async def upload_app(
 
     # Request agent to run
     try:
-        resp = requests.post(
-            f"{AGENT_URL}/run",
-            json={
-                "app_id": app_id,
-                "path": app_dir,
-                "type": app_type,
-                "log_path": log_path,
-                "port": port,
-                "allow_ips": allowed,
-                "auth_header": auth_header,
-            },
-            timeout=5,
-        )
-        resp.raise_for_status()
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{AGENT_URL}/run",
+                json={
+                    "app_id": app_id,
+                    "path": app_dir,
+                    "type": app_type,
+                    "log_path": log_path,
+                    "port": port,
+                    "allow_ips": allowed,
+                    "auth_header": auth_header,
+                },
+                timeout=5,
+            )
+            resp.raise_for_status()
         save_status(app_id, "running", log_path)
-    except requests.exceptions.ConnectionError:
+    except httpx.ConnectError:
         AVAILABLE_PORTS.add(port)
         save_status(app_id, "error", log_path)
         raise HTTPException(
             status_code=502,
             detail="Unable to reach agent. Please ensure the agent is running and reachable.",
         )
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         AVAILABLE_PORTS.add(port)
         save_status(app_id, "error", log_path)
         raise HTTPException(
@@ -251,12 +252,13 @@ async def heartbeat(hb: Heartbeat):
 @app.post("/stop")
 async def stop_app(req: StopRequest):
     try:
-        resp = requests.post(
-            f"{AGENT_URL}/stop",
-            json={"app_id": req.app_id},
-            timeout=5,
-        )
-        resp.raise_for_status()
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{AGENT_URL}/stop",
+                json={"app_id": req.app_id},
+                timeout=5,
+            )
+            resp.raise_for_status()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -299,7 +301,12 @@ async def stop_app(app_id: str):
 
     # Notify the agent
     try:
-        requests.post(f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5)
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{AGENT_URL}/stop",
+                json={"app_id": app_id},
+                timeout=5,
+            )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -323,17 +330,23 @@ async def delete_app(app_id: str):
 
     if status == "running":
         try:
-            requests.post(
-                f"{AGENT_URL}/stop", json={"app_id": app_id}, timeout=5
-            )
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{AGENT_URL}/stop",
+                    json={"app_id": app_id},
+                    timeout=5,
+                )
         except Exception:
             pass
     else:
         # Ensure the proxy route is removed for non-running apps
         try:
-            requests.post(
-                f"{AGENT_URL}/remove_route", json={"app_id": app_id}, timeout=5
-            )
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{AGENT_URL}/remove_route",
+                    json={"app_id": app_id},
+                    timeout=5,
+                )
         except Exception:
             pass
 
