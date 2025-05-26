@@ -13,9 +13,6 @@ import time
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
-# store running processes keyed by app_id
-processes = {}
-
 app = FastAPI()
 
 # Track running processes
