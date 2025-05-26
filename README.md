@@ -105,10 +105,10 @@ generated config. You can also set `PROXY_CONFIG_PATH` to write directly to the
 Nginx directory. After writing the file, the agent calls `nginx -s reload` to
 apply the changes. Without this step requests fall back to the backend and
 return "Method Not Allowed." Each app is accessible via
-`http://<server>/apps/<app_id>/` (port 80) and proxied to its assigned port.
+`http://<server>:8080/apps/<app_id>/` (port 8080) and proxied to its assigned port.
 ```
 server {
-    listen 80;
+    listen 8080;
     location /apps/<app_id>/ {
         proxy_pass http://127.0.0.1:<port>/;
     }
