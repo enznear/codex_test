@@ -15,7 +15,7 @@ BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 app = FastAPI()
 
-# Track running processes
+# Track running processes mapping app_id -> {"proc": process, "type": "docker"/"gradio"}
 
 PROCESSES = {}
 
@@ -111,7 +111,9 @@ async def build_and_run(req: RunRequest):
         cmd = [sys.executable, os.path.join(req.path, target)]
         proc = await async_run_detached(cmd, req.log_path, env={"PORT": str(req.port)})
 
-    PROCESSES[req.app_id] = proc
+    # Store the process along with the type so that cleanup can behave
+    # differently for docker vs gradio apps
+    PROCESSES[req.app_id] = {"proc": proc, "type": req.type}
     asyncio.create_task(heartbeat_loop(req.app_id))
 
     try:
@@ -127,7 +129,8 @@ async def build_and_run(req: RunRequest):
 
 async def heartbeat_loop(app_id: str):
     """Send periodic heartbeats and detect process exit."""
-    proc = PROCESSES.get(app_id)
+    entry = PROCESSES.get(app_id)
+    proc = entry["proc"] if entry else None
     while proc:
         if proc.returncode is not None:
             status = "finished" if proc.returncode == 0 else "error"
@@ -152,14 +155,18 @@ async def heartbeat_loop(app_id: str):
         except Exception:
             pass
         await asyncio.sleep(5)
+        entry = PROCESSES.get(app_id)
+        proc = entry["proc"] if entry else None
 
 
 @app.post("/stop")
 async def stop_app(req: StopRequest):
     """Stop a running app process."""
-    proc = PROCESSES.get(req.app_id)
-    if not proc:
+    entry = PROCESSES.get(req.app_id)
+    if not entry:
         raise HTTPException(status_code=404, detail="app not running")
+    proc = entry["proc"]
+    app_type = entry.get("type")
 
     try:
         proc.terminate()
@@ -174,8 +181,9 @@ async def stop_app(req: StopRequest):
 
     PROCESSES.pop(req.app_id, None)
 
-    # Best effort stop docker container if one was started
-    subprocess.run(["docker", "stop", req.app_id], check=False)
+    # Best effort stop docker container only if the app used docker
+    if app_type == "docker":
+        subprocess.run(["docker", "stop", req.app_id], check=False)
 
     # Remove proxy route and notify backend
     remove_route(req.app_id)
