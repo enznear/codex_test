@@ -132,7 +132,7 @@ async def heartbeat_loop(app_id: str):
     """Send periodic heartbeats and detect process exit."""
     proc = PROCESSES.get(app_id)
     while proc:
-        if proc.poll() is not None:
+        if proc.returncode is not None:
             status = "finished" if proc.returncode == 0 else "error"
             try:
                 requests.post(
