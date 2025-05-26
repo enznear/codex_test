@@ -52,41 +52,79 @@ def run_command(cmd, log_path, wait=True, env=None):
         return process.returncode
     return process
 
+
+async def async_run_wait(cmd, log_path, env=None):
+    """Run a command asynchronously and wait for it to finish."""
+    env_vars = os.environ.copy()
+    if env:
+        env_vars.update(env)
+    with open(log_path, "a") as log:
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=log, stderr=log, env=env_vars)
+        await proc.wait()
+        return proc.returncode
+
+
+async def async_run_detached(cmd, log_path, env=None):
+    """Run a command asynchronously without waiting."""
+    env_vars = os.environ.copy()
+    if env:
+        env_vars.update(env)
+    with open(log_path, "a") as log:
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=log, stderr=log, env=env_vars)
+    return proc
+
 @app.post("/run")
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
-    # configure the proxy for the assigned port
+    # configure the proxy for the assigned port and start build/run in background
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    background_tasks.add_task(build_and_run, req)
+    return {"detail": "building"}
+
+
+async def build_and_run(req: RunRequest):
+    """Build docker image if needed then run the app."""
     if req.type == "docker":
         build_cmd = ["docker", "build", "-t", req.app_id, req.path]
-        ret = run_command(build_cmd, req.log_path)
+        ret = await async_run_wait(build_cmd, req.log_path)
         if ret != 0:
-            requests.post(
-                f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "error"},
-            )
-            raise HTTPException(status_code=500, detail="build failed")
-
+            try:
+                requests.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": req.app_id, "status": "error"},
+                    timeout=5,
+                )
+            finally:
+                remove_route(req.app_id)
+            return
         run_cmd = ["docker", "run", "--rm", "-p", f"{req.port}:{req.port}", "--name", req.app_id, req.app_id]
-        proc = run_command(run_cmd, req.log_path, False, env={"PORT": str(req.port)})
-
+        proc = await async_run_detached(run_cmd, req.log_path, env={"PORT": str(req.port)})
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
         target = py_files[0] if py_files else None
         if not target:
-            requests.post(
-                f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "error"},
-            )
-            raise HTTPException(status_code=400, detail="no python file")
+            try:
+                requests.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": req.app_id, "status": "error"},
+                    timeout=5,
+                )
+            finally:
+                remove_route(req.app_id)
+            return
         cmd = [sys.executable, os.path.join(req.path, target)]
-        proc = run_command(cmd, req.log_path, False, env={"PORT": str(req.port)})
+        proc = await async_run_detached(cmd, req.log_path, env={"PORT": str(req.port)})
+
     PROCESSES[req.app_id] = proc
-    background_tasks.add_task(heartbeat_loop, req.app_id)
+    asyncio.create_task(heartbeat_loop(req.app_id))
 
-    # report running status
-    requests.post(f"{BACKEND_URL}/update_status", json={"app_id": req.app_id, "status": "running"})
-
-    return {"detail": "started"}
+    try:
+        requests.post(
+            f"{BACKEND_URL}/update_status",
+            json={"app_id": req.app_id, "status": "running"},
+            timeout=5,
+        )
+    except Exception:
+        pass
 
 
 
