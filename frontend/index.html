@@ -14,8 +14,8 @@
 
   <script type="text/babel">
     const { useState, useEffect } = React;
-    // Nginx serves apps on port 80, so just use the current protocol/host
-    const nginxBase = window.location.protocol + '//' + window.location.hostname;
+    // Nginx serves apps on port 8080
+    const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
 
     function App() {
       const [name, setName] = useState('');

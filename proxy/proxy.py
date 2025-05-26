@@ -47,7 +47,7 @@ def save_routes(routes):
 
 
 def generate_config(routes):
-    lines = ["server {", "    listen 80;"]
+    lines = ["server {", "    listen 8080;"]
     for app_id, info in routes.items():
         lines.append(f"    location = /apps/{app_id} {{")
         lines.append(f"        return 301 /apps/{app_id}/;")
