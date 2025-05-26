@@ -41,6 +41,7 @@ def run_command(cmd, log_path, wait=True, env=None):
     env_vars = os.environ.copy()
     if env:
         env_vars.update(env)
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     with open(log_path, "a") as log:
         process = subprocess.Popen(cmd, stdout=log, stderr=log, env=env_vars)
 
@@ -55,6 +56,7 @@ async def async_run_wait(cmd, log_path, env=None):
     env_vars = os.environ.copy()
     if env:
         env_vars.update(env)
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     with open(log_path, "a") as log:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=log, stderr=log, env=env_vars)
         await proc.wait()
@@ -66,6 +68,7 @@ async def async_run_detached(cmd, log_path, env=None):
     env_vars = os.environ.copy()
     if env:
         env_vars.update(env)
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     with open(log_path, "a") as log:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=log, stderr=log, env=env_vars)
     return proc
