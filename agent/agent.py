@@ -96,7 +96,18 @@ async def build_and_run(req: RunRequest):
             finally:
                 remove_route(req.app_id)
             return
-        run_cmd = ["docker", "run", "--rm", "-p", f"{req.port}:{req.port}", "--name", req.app_id, req.app_id]
+        run_cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "-p",
+            f"{req.port}:{req.port}",
+            "-e",
+            f"PORT={req.port}",
+            "--name",
+            req.app_id,
+            req.app_id,
+        ]
         proc = await async_run_detached(run_cmd, req.log_path, env={"PORT": str(req.port)})
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
