@@ -75,6 +75,11 @@ The agent builds and runs Docker or Gradio apps and reports status back to the b
 
 The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps should listen on the port indicated by this `PORT` environment variable.
 
+During upload the backend now verifies that the chosen port is free by briefly
+binding to it. If the port is busy another from the `AVAILABLE_PORTS` pool is
+tried. The agent performs the same check before launching an app, failing the
+run if the port cannot be bound.
+
 
 Example setup:
 

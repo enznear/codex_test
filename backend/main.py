@@ -12,6 +12,7 @@ import httpx
 import re
 import time
 import asyncio
+import socket
 
 DATABASE = "./app.db"
 UPLOAD_DIR = "./uploads"
@@ -79,6 +80,17 @@ def release_app_port(app_id: str):
         c.execute("UPDATE apps SET port=NULL WHERE id=?", (app_id,))
         conn.commit()
     conn.close()
+
+def is_port_free(port: int) -> bool:
+    """Check if a TCP port is available."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
 
 class StatusUpdate(BaseModel):
     app_id: str
@@ -204,7 +216,15 @@ async def upload_app(
     # Allocate a port for the app
     if not AVAILABLE_PORTS:
         raise HTTPException(status_code=503, detail="no available ports")
-    port = AVAILABLE_PORTS.pop()
+    port = None
+    while AVAILABLE_PORTS:
+        candidate = AVAILABLE_PORTS.pop()
+        if is_port_free(candidate):
+            port = candidate
+            break
+        # port was busy, keep looking
+    if port is None:
+        raise HTTPException(status_code=503, detail="no available ports")
     url = f"/apps/{app_id}/"
     save_status(
         app_id,
