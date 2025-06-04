@@ -98,6 +98,7 @@ def save_status(
     heartbeat: float = None,
     name: str = None,
     url: str = None,
+    app_type: str = None,
 ):
 
     conn = sqlite3.connect(DATABASE)
@@ -125,13 +126,25 @@ def save_status(
         if url is not None:
             fields.append("url=?")
             values.append(url)
+        if app_type is not None:
+            fields.append("type=?")
+            values.append(app_type)
         if fields:
             values.append(app_id)
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
             "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url) VALUES(?,?,?,?,?,?,?,?)",
-            (app_id, name or app_id, '', status or '', log_path, port, heartbeat, url),
+            (
+                app_id,
+                name or app_id,
+                app_type or "",
+                status or "",
+                log_path,
+                port,
+                heartbeat,
+                url,
+            ),
 
         )
     conn.commit()
@@ -193,7 +206,15 @@ async def upload_app(
         raise HTTPException(status_code=503, detail="no available ports")
     port = AVAILABLE_PORTS.pop()
     url = f"/apps/{app_id}/"
-    save_status(app_id, "uploaded", log_path, port=port, name=name.strip(), url=url)
+    save_status(
+        app_id,
+        "uploaded",
+        log_path,
+        port=port,
+        name=name.strip(),
+        url=url,
+        app_type=app_type,
+    )
 
 
     # Request agent to run
@@ -213,24 +234,24 @@ async def upload_app(
                 timeout=5,
             )
             resp.raise_for_status()
-        save_status(app_id, "running", log_path)
+        save_status(app_id, "running", log_path, app_type=app_type)
     except httpx.ConnectError:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path)
+        save_status(app_id, "error", log_path, app_type=app_type)
         raise HTTPException(
             status_code=502,
             detail="Unable to reach agent. Please ensure the agent is running and reachable.",
         )
     except httpx.TimeoutException:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path)
+        save_status(app_id, "error", log_path, app_type=app_type)
         raise HTTPException(
             status_code=504,
             detail="Agent request timed out. Please make sure the agent is running.",
         )
     except Exception as e:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path)
+        save_status(app_id, "error", log_path, app_type=app_type)
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"app_id": app_id, "status": "running", "url": url}
