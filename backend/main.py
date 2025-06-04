@@ -288,7 +288,7 @@ async def get_logs(app_id: str):
 
 
 @app.post("/stop/{app_id}")
-async def stop_app(app_id: str):
+async def stop_app_by_id(app_id: str):
     """Stop a running app via the agent and mark it stopped."""
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
