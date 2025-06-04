@@ -386,6 +386,19 @@ async def cleanup_task():
 
 @app.on_event("startup")
 async def startup_event():
+    # Remove ports for any apps that are already running
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT port FROM apps WHERE status='running' AND port IS NOT NULL"
+    )
+    rows = c.fetchall()
+    conn.close()
+    for row in rows:
+        port = row[0]
+        if port in AVAILABLE_PORTS:
+            AVAILABLE_PORTS.remove(port)
+
     asyncio.create_task(cleanup_task())
 
 
