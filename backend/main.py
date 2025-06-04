@@ -1,5 +1,5 @@
 """FastAPI backend for MLOps app deployment."""
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks
 from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -271,21 +271,42 @@ async def heartbeat(hb: Heartbeat):
 
 
 @app.post("/stop")
-async def stop_app(req: StopRequest):
+async def stop_app(req: StopRequest, background_tasks: BackgroundTasks):
+    # It might be good to add a check here if app_id from req.app_id exists, similar to stop_app_by_id.
+    # For now, proceeding as per the direct conversion of existing logic.
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE id=?", (req.app_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="app not found")
+    conn.close()
+
+    save_status(req.app_id, "stopping")
+    background_tasks.add_task(_stop_agent_and_update_status, req.app_id)
+    return {"detail": "stopping process initiated"}
+
+
+async def _stop_agent_and_update_status(app_id: str):
+    """Helper function to stop agent and update status in the background."""
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(
+            await client.post(
                 f"{AGENT_URL}/stop",
-                json={"app_id": req.app_id},
+                json={"app_id": app_id},
                 timeout=5,
             )
-            resp.raise_for_status()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log this error or handle it more gracefully
+        # For now, we'll proceed to update status to avoid app being stuck in "stopping"
+        print(f"Error stopping agent for {app_id}: {e}")
+        save_status(app_id, "error") # Or a more specific error status
+        release_app_port(app_id)
+        return
 
-    save_status(req.app_id, "finished")
-    release_app_port(req.app_id)
-    return {"detail": "stopped"}
+    save_status(app_id, "stopped")
+    release_app_port(app_id)
 
 @app.get("/status")
 async def get_status():
@@ -309,7 +330,7 @@ async def get_logs(app_id: str):
 
 
 @app.post("/stop/{app_id}")
-async def stop_app_by_id(app_id: str):
+async def stop_app_by_id(app_id: str, background_tasks: BackgroundTasks):
     """Stop a running app via the agent and mark it stopped."""
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
@@ -320,20 +341,9 @@ async def stop_app_by_id(app_id: str):
         raise HTTPException(status_code=404, detail="app not found")
     conn.close()
 
-    # Notify the agent
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{AGENT_URL}/stop",
-                json={"app_id": app_id},
-                timeout=5,
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    save_status(app_id, "stopped")
-    release_app_port(app_id)
-    return {"detail": "stopped"}
+    save_status(app_id, "stopping")
+    background_tasks.add_task(_stop_agent_and_update_status, app_id)
+    return {"detail": "stopping process initiated"}
 
 
 @app.delete("/apps/{app_id}")
