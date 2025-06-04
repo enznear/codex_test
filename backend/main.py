@@ -402,6 +402,28 @@ async def cleanup_task():
             c.execute("UPDATE apps SET status='error' WHERE id=?", (app_id,))
             conn.commit()
             release_app_port(app_id)
+            # Attempt to stop the app on the agent so lingering processes and
+            # proxy routes are cleaned up. If stopping fails (e.g. the agent no
+            # longer has a record of the app), fall back to removing the proxy
+            # route directly.
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.post(
+                        f"{AGENT_URL}/stop",
+                        json={"app_id": app_id},
+                        timeout=5,
+                    )
+                    resp.raise_for_status()
+            except Exception:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{AGENT_URL}/remove_route",
+                            json={"app_id": app_id},
+                            timeout=5,
+                        )
+                except Exception:
+                    pass
         conn.close()
 
 
