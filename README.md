@@ -73,7 +73,7 @@ uvicorn agent.agent:app --port 8001
 
 The agent builds and runs Docker or Gradio apps and reports status back to the backend.
 
-The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts.
+The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps should listen on the port indicated by this `PORT` environment variable.
 
 
 Example setup:
