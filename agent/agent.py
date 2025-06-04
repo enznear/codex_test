@@ -6,6 +6,7 @@ import os
 import sys
 import requests
 import asyncio
+import socket
 from typing import List, Optional
 from proxy.proxy import add_route, remove_route
 import threading
@@ -35,6 +36,17 @@ class StopRequest(BaseModel):
 
 class RemoveRouteRequest(BaseModel):
     app_id: str
+
+def is_port_free(port: int) -> bool:
+    """Check whether a port can be bound."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
 
 def run_command(cmd, log_path, wait=True, env=None):
     """Run a command and optionally wait for completion."""
@@ -83,6 +95,16 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
 
 async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
+    if not is_port_free(req.port):
+        try:
+            requests.post(
+                f"{BACKEND_URL}/update_status",
+                json={"app_id": req.app_id, "status": "error"},
+                timeout=5,
+            )
+        finally:
+            remove_route(req.app_id)
+        return
     if req.type == "docker":
         build_cmd = ["docker", "build", "-t", req.app_id, req.path]
         ret = await async_run_wait(build_cmd, req.log_path)
