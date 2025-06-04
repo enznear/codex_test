@@ -47,6 +47,9 @@
       const handleUpload = (e) => {
         e.preventDefault();
         if (files.length === 0) return;
+        if (files.length > 1) {
+          alert('Multiple files selected. Only the first file will be uploaded. Bundle files into a zip to upload them all.');
+        }
         const formData = new FormData();
         formData.append('name', name);
         formData.append('file', files[0]);
