@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import subprocess
 import os
 import sys
-import requests
+import httpx
 import asyncio
 import socket
 from typing import List, Optional
@@ -97,11 +97,12 @@ async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
     if not is_port_free(req.port):
         try:
-            requests.post(
-                f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "error"},
-                timeout=5,
-            )
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": req.app_id, "status": "error"},
+                    timeout=5,
+                )
         finally:
             remove_route(req.app_id)
         return
@@ -110,11 +111,12 @@ async def build_and_run(req: RunRequest):
         ret = await async_run_wait(build_cmd, req.log_path)
         if ret != 0:
             try:
-                requests.post(
-                    f"{BACKEND_URL}/update_status",
-                    json={"app_id": req.app_id, "status": "error"},
-                    timeout=5,
-                )
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": req.app_id, "status": "error"},
+                        timeout=5,
+                    )
             finally:
                 remove_route(req.app_id)
             return
@@ -136,11 +138,12 @@ async def build_and_run(req: RunRequest):
         target = py_files[0] if py_files else None
         if not target:
             try:
-                requests.post(
-                    f"{BACKEND_URL}/update_status",
-                    json={"app_id": req.app_id, "status": "error"},
-                    timeout=5,
-                )
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": req.app_id, "status": "error"},
+                        timeout=5,
+                    )
             finally:
                 remove_route(req.app_id)
             return
@@ -153,11 +156,12 @@ async def build_and_run(req: RunRequest):
     asyncio.create_task(heartbeat_loop(req.app_id))
 
     try:
-        requests.post(
-            f"{BACKEND_URL}/update_status",
-            json={"app_id": req.app_id, "status": "running"},
-            timeout=5,
-        )
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{BACKEND_URL}/update_status",
+                json={"app_id": req.app_id, "status": "running"},
+                timeout=5,
+            )
     except Exception:
         pass
 
@@ -171,11 +175,12 @@ async def heartbeat_loop(app_id: str):
         if proc.returncode is not None:
             status = "finished" if proc.returncode == 0 else "error"
             try:
-                requests.post(
-                    f"{BACKEND_URL}/update_status",
-                    json={"app_id": app_id, "status": status},
-                    timeout=5,
-                )
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": app_id, "status": status},
+                        timeout=5,
+                    )
             except Exception:
                 pass
             # Clean up Nginx routing for this app
@@ -183,11 +188,12 @@ async def heartbeat_loop(app_id: str):
             PROCESSES.pop(app_id, None)
             break
         try:
-            requests.post(
-                f"{BACKEND_URL}/heartbeat",
-                json={"app_id": app_id},
-                timeout=5,
-            )
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/heartbeat",
+                    json={"app_id": app_id},
+                    timeout=5,
+                )
         except Exception:
             pass
         await asyncio.sleep(5)
@@ -225,11 +231,12 @@ async def stop_app(req: StopRequest):
     remove_route(req.app_id)
 
     try:
-        requests.post(
-            f"{BACKEND_URL}/update_status",
-            json={"app_id": req.app_id, "status": "finished"},
-            timeout=5,
-        )
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{BACKEND_URL}/update_status",
+                json={"app_id": req.app_id, "status": "finished"},
+                timeout=5,
+            )
     except Exception:
         pass
 
