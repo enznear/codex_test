@@ -44,6 +44,21 @@
           });
       };
 
+      const pollStatus = (appId) => {
+        const interval = setInterval(() => {
+          fetch('/status')
+            .then(res => res.json())
+            .then(data => {
+              setApps(data);
+              const app = data.find(a => a.id === appId);
+              if (!app || app.status !== 'stopping') {
+                clearInterval(interval);
+              }
+            })
+            .catch(() => {});
+        }, 2000);
+      };
+
       const handleUpload = (e) => {
         e.preventDefault();
         if (files.length === 0) return;
@@ -92,7 +107,10 @@
 
       const stopApp = (id) => {
         fetch(`/stop/${id}`, { method: 'POST' })
-          .then(() => refreshStatus())
+          .then(() => {
+            refreshStatus();
+            pollStatus(id);
+          })
           .catch(() => {});
       };
 
