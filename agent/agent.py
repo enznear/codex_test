@@ -234,7 +234,7 @@ async def stop_app(req: StopRequest):
         async with httpx.AsyncClient() as client:
             await client.post(
                 f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "finished"},
+                json={"app_id": req.app_id, "status": "stopped"},
                 timeout=5,
             )
     except Exception:
