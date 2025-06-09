@@ -128,11 +128,17 @@ async def build_and_run(req: RunRequest):
             f"{req.port}:{req.port}",
             "-e",
             f"PORT={req.port}",
+            "-e",
+            f"ROOT_PATH=/apps/{req.app_id}",
             "--name",
             req.app_id,
             req.app_id,
         ]
-        proc = await async_run_detached(run_cmd, req.log_path, env={"PORT": str(req.port)})
+        proc = await async_run_detached(
+            run_cmd,
+            req.log_path,
+            env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
+        )
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
         target = py_files[0] if py_files else None
@@ -148,7 +154,11 @@ async def build_and_run(req: RunRequest):
                 remove_route(req.app_id)
             return
         cmd = [sys.executable, os.path.join(req.path, target)]
-        proc = await async_run_detached(cmd, req.log_path, env={"PORT": str(req.port)})
+        proc = await async_run_detached(
+            cmd,
+            req.log_path,
+            env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
+        )
 
     # Store the process along with the type so that cleanup can behave
     # differently for docker vs gradio apps

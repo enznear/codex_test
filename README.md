@@ -51,6 +51,7 @@ uvicorn backend.main:app --reload
 
 1. **Prepare your files**
    - **Gradio**: upload a single Python file or a zip archive containing your Gradio app. The backend will run the first `.py` file it finds in the uploaded directory.
+     You can use `examples/gradio_app.py` as a starting point; it reads the `ROOT_PATH` environment variable so the app works behind the proxy.
    - **Docker**: include a `Dockerfile` in the uploaded directory or archive. If a `Dockerfile` is present the backend treats the app as a Docker project and builds it with `docker build`.
 
 2. **Send a request**
@@ -73,7 +74,7 @@ uvicorn agent.agent:app --port 8001
 
 The agent builds and runs Docker or Gradio apps and reports status back to the backend.
 
-The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps should listen on the port indicated by this `PORT` environment variable.
+The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps should listen on the port indicated by this `PORT` environment variable. The agent additionally sets `ROOT_PATH` to `/apps/<app_id>` so frameworks like Gradio can launch under the correct path prefix by passing this value to their `root_path` argument.
 
 During upload the backend now verifies that the chosen port is free by briefly
 binding to it. If the port is busy another from the `AVAILABLE_PORTS` pool is
