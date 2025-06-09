@@ -11,6 +11,9 @@ Install the required Python packages:
 pip install -r requirements.txt
 ```
 
+Running `flake8` (or another linter) before committing is recommended to catch
+style issues early. This tool may need to be installed locally.
+
 ## Prerequisites
 
 - Python 3 with the following packages:
