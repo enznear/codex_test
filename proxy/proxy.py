@@ -53,7 +53,7 @@ def generate_config(routes):
         lines.append(f"        return 301 /apps/{app_id}/;")
         lines.append("    }")
         lines.append(f"    location /apps/{app_id}/ {{")
-        lines.append(f"        proxy_pass http://127.0.0.1:{info['port']}/;")
+        lines.append(f"        proxy_pass http://127.0.0.1:{info['port']};")
         if info.get("allow_ips"):
             for ip in info["allow_ips"]:
                 lines.append(f"        allow {ip};")

@@ -116,7 +116,7 @@ return "Method Not Allowed." Each app is accessible via
 server {
     listen 8080;
     location /apps/<app_id>/ {
-        proxy_pass http://127.0.0.1:<port>/;
+        proxy_pass http://127.0.0.1:<port>;
     }
 }
 ```
