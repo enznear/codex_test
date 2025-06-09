@@ -54,6 +54,10 @@ def generate_config(routes):
         lines.append("    }")
         lines.append(f"    location /apps/{app_id}/ {{")
         lines.append(f"        proxy_pass http://127.0.0.1:{info['port']};")
+        lines.append("        proxy_http_version 1.1;")
+        lines.append("        proxy_set_header Upgrade $http_upgrade;")
+        lines.append('        proxy_set_header Connection "upgrade";')
+        lines.append("        proxy_set_header Host $host;")
         if info.get("allow_ips"):
             for ip in info["allow_ips"]:
                 lines.append(f"        allow {ip};")
