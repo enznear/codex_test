@@ -117,13 +117,18 @@ server {
     listen 8080;
     location /apps/<app_id>/ {
         proxy_pass http://127.0.0.1:<port>;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
     }
 }
 ```
 
-You can restrict access by providing `allow_ips` (comma separated IP list) or an
-`auth_header` when uploading an app. These values are injected into the Nginx
-location block.
+Gradio apps rely on WebSockets, so the proxy configuration must forward upgrade
+headers as shown above. You can restrict access by providing `allow_ips`
+(comma separated IP list) or an `auth_header` when uploading an app. These
+values are injected into the Nginx location block.
 ## Frontend
 
 A minimal React+Tailwind UI is included in `frontend/index.html`. The backend now serves this file automatically, so simply navigate to `http://localhost:8000` in your browser after starting the backend.
