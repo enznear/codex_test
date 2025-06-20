@@ -26,6 +26,7 @@
       const [logs, setLogs] = useState({});
       const [showLogs, setShowLogs] = useState({});
       const [uploadMsg, setUploadMsg] = useState('');
+      const [uploadProgress, setUploadProgress] = useState(0);
 
       useEffect(() => {
         fetch('/status')
@@ -68,13 +69,19 @@
         const formData = new FormData();
         formData.append('name', name);
         formData.append('file', files[0]);
-        fetch('/upload', {
-          method: 'POST',
-          body: formData
-        }).then(async res => {
-          const data = await res.json().catch(() => ({}));
-          if (res.ok) {
-            setUploadMsg('Upload started: ' + data.app_id);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload');
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          let data = {};
+          try { data = JSON.parse(xhr.responseText); } catch (e) {}
+          setUploadProgress(0);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setUploadMsg('Upload started: ' + (data.app_id || ''));
             setName('');
             setDescription('');
             setRunType('gradio');
@@ -83,9 +90,12 @@
           } else {
             setUploadMsg('Error: ' + (data.detail || 'upload failed'));
           }
-        }).catch(() => {
+        };
+        xhr.onerror = () => {
           setUploadMsg('Error uploading app.');
-        });
+          setUploadProgress(0);
+        };
+        xhr.send(formData);
       };
 
       const toggleLogs = (appId) => {
@@ -148,6 +158,11 @@
             </div>
             <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Upload</button>
           </form>
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="w-full bg-gray-200 h-2 mt-2 rounded">
+              <div className="bg-blue-600 h-2 rounded" style={{width: `${uploadProgress}%`}}></div>
+            </div>
+          )}
           {uploadMsg && <p className="text-sm mt-2">{uploadMsg}</p>}
 
           <div className="grid gap-4">
