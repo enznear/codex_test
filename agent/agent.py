@@ -16,7 +16,7 @@ BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 app = FastAPI()
 
-# Track running processes mapping app_id -> {"proc": process, "type": "docker"/"gradio"}
+# Track running processes mapping app_id -> {"proc": process, "type": "docker"/"docker_tar"/"gradio"}
 
 PROCESSES = {}
 
@@ -139,6 +139,61 @@ async def build_and_run(req: RunRequest):
             req.log_path,
             env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
         )
+    elif req.type == "docker_tar":
+        image_tag = None
+        try:
+            import tarfile, json
+
+            with tarfile.open(req.path) as tf:
+                mf = tf.extractfile("manifest.json")
+                if mf:
+                    manifest = json.load(mf)
+                    tags = manifest[0].get("RepoTags")
+                    if tags:
+                        image_tag = tags[0]
+                    else:
+                        cfg = manifest[0].get("Config")
+                        if cfg:
+                            image_tag = cfg.split(".")[0]
+        except Exception:
+            image_tag = None
+
+        load_cmd = ["docker", "load", "-i", req.path]
+        ret = await async_run_wait(load_cmd, req.log_path)
+        if ret != 0:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": req.app_id, "status": "error"},
+                        timeout=5,
+                    )
+            finally:
+                remove_route(req.app_id)
+            return
+
+        run_image = image_tag or req.app_id
+        run_cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "--gpus",
+            "all",
+            "--network",
+            "host",
+            "-e",
+            f"PORT={req.port}",
+            "-e",
+            f"ROOT_PATH=/apps/{req.app_id}",
+            "--name",
+            req.app_id,
+            run_image,
+        ]
+        proc = await async_run_detached(
+            run_cmd,
+            req.log_path,
+            env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
+        )
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
         target = py_files[0] if py_files else None
@@ -233,8 +288,8 @@ async def stop_app(req: StopRequest):
 
     PROCESSES.pop(req.app_id, None)
 
-    # Best effort stop docker container only if the app used docker
-    if app_type == "docker":
+    # Best effort stop docker container for docker-based apps
+    if app_type in ("docker", "docker_tar"):
         subprocess.run(["docker", "stop", req.app_id], check=False)
 
     # Remove proxy route and notify backend

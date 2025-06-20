@@ -203,14 +203,17 @@ async def upload_app(
             z.extractall(app_dir)
 
     # Detect app type
-    app_type = "gradio"
-    for root, _, files in os.walk(app_dir):
-        for fname in files:
-            if fname.lower() == "dockerfile":
-                app_type = "docker"
+    if filename.lower().endswith(".tar"):
+        app_type = "docker_tar"
+    else:
+        app_type = "gradio"
+        for root, _, files in os.walk(app_dir):
+            for fname in files:
+                if fname.lower() == "dockerfile":
+                    app_type = "docker"
+                    break
+            if app_type == "docker":
                 break
-        if app_type == "docker":
-            break
 
     log_path = os.path.join(LOG_DIR, f"{app_id}.log")
     # Allocate a port for the app
@@ -237,6 +240,9 @@ async def upload_app(
     )
 
 
+    # Path sent to the agent depends on app type
+    run_path = file_location if app_type == "docker_tar" else app_dir
+
     # Request agent to run
     try:
         async with httpx.AsyncClient() as client:
@@ -244,7 +250,7 @@ async def upload_app(
                 f"{AGENT_URL}/run",
                 json={
                     "app_id": app_id,
-                    "path": app_dir,
+                    "path": run_path,
                     "type": app_type,
                     "log_path": log_path,
                     "port": port,
