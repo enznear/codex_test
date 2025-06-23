@@ -124,6 +124,14 @@
           .catch(() => {});
       };
 
+      const restartApp = (id) => {
+        fetch(`/restart/${id}`, { method: 'POST' })
+          .then(() => {
+            refreshStatus();
+          })
+          .catch(() => {});
+      };
+
       const deleteApp = (id) => {
         fetch(`/apps/${id}`, { method: 'DELETE' })
           .then(() => {
@@ -179,6 +187,7 @@
                   <div className="space-x-2">
                     <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
                     <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
+                    <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
                     <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
                   </div>
                 </div>

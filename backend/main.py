@@ -49,7 +49,9 @@ def init_db():
             log_path TEXT,
             port INTEGER,
             last_heartbeat REAL,
-            url TEXT
+            url TEXT,
+            allow_ips TEXT,
+            auth_header TEXT
         )
         """
     )
@@ -62,6 +64,10 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN last_heartbeat REAL")
     if "url" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN url TEXT")
+    if "allow_ips" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN allow_ips TEXT")
+    if "auth_header" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN auth_header TEXT")
     conn.commit()
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -111,6 +117,8 @@ def save_status(
     name: str = None,
     url: str = None,
     app_type: str = None,
+    allow_ips: str = None,
+    auth_header: str = None,
 ):
 
     conn = sqlite3.connect(DATABASE)
@@ -141,12 +149,18 @@ def save_status(
         if app_type is not None:
             fields.append("type=?")
             values.append(app_type)
+        if allow_ips is not None:
+            fields.append("allow_ips=?")
+            values.append(allow_ips)
+        if auth_header is not None:
+            fields.append("auth_header=?")
+            values.append(auth_header)
         if fields:
             values.append(app_id)
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url) VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header) VALUES(?,?,?,?,?,?,?,?,?,?)",
             (
                 app_id,
                 name or app_id,
@@ -156,6 +170,8 @@ def save_status(
                 port,
                 heartbeat,
                 url,
+                allow_ips,
+                auth_header,
             ),
 
         )
@@ -172,6 +188,7 @@ async def upload_app(
 
     """Receive user uploaded app and trigger agent build/run."""
     allowed = [ip.strip() for ip in allow_ips.split(',')] if allow_ips else None
+    allowed_str = ",".join(allowed) if allowed else None
     # Reject duplicate app names
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
@@ -237,6 +254,8 @@ async def upload_app(
         name=name.strip(),
         url=url,
         app_type=app_type,
+        allow_ips=allowed_str,
+        auth_header=auth_header,
     )
 
 
@@ -260,24 +279,52 @@ async def upload_app(
                 timeout=5,
             )
             resp.raise_for_status()
-        save_status(app_id, "running", log_path, app_type=app_type)
+        save_status(
+            app_id,
+            "running",
+            log_path,
+            app_type=app_type,
+            allow_ips=allowed_str,
+            auth_header=auth_header,
+        )
     except httpx.ConnectError:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type)
+        save_status(
+            app_id,
+            "error",
+            log_path,
+            app_type=app_type,
+            allow_ips=allowed_str,
+            auth_header=auth_header,
+        )
         raise HTTPException(
             status_code=502,
             detail="Unable to reach agent. Please ensure the agent is running and reachable.",
         )
     except httpx.TimeoutException:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type)
+        save_status(
+            app_id,
+            "error",
+            log_path,
+            app_type=app_type,
+            allow_ips=allowed_str,
+            auth_header=auth_header,
+        )
         raise HTTPException(
             status_code=504,
             detail="Agent request timed out. Please make sure the agent is running.",
         )
     except Exception as e:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type)
+        save_status(
+            app_id,
+            "error",
+            log_path,
+            app_type=app_type,
+            allow_ips=allowed_str,
+            auth_header=auth_header,
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"app_id": app_id, "status": "running", "url": url}
@@ -370,6 +417,87 @@ async def stop_app_by_id(app_id: str, background_tasks: BackgroundTasks):
     save_status(app_id, "stopping")
     background_tasks.add_task(_stop_agent_and_update_status, app_id)
     return {"detail": "stopping process initiated"}
+
+
+@app.post("/restart/{app_id}")
+async def restart_app(app_id: str):
+    """Restart a previously uploaded app using its existing image."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT type, log_path, port, allow_ips, auth_header FROM apps WHERE id=?",
+        (app_id,),
+    )
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="app not found")
+    app_type, log_path, stored_port, allow_ips_str, auth_header = row
+    conn.close()
+
+    allowed = [ip.strip() for ip in allow_ips_str.split(',')] if allow_ips_str else None
+
+    app_dir = os.path.join(UPLOAD_DIR, app_id)
+    if app_type == "docker_tar":
+        files = [f for f in os.listdir(app_dir) if f.endswith(".tar")]
+        if not files:
+            raise HTTPException(status_code=500, detail="tar file missing")
+        run_path = os.path.join(app_dir, files[0])
+    else:
+        run_path = app_dir
+
+    port = stored_port if stored_port and is_port_free(stored_port) else None
+    if port is not None and port in AVAILABLE_PORTS:
+        AVAILABLE_PORTS.remove(port)
+    if port is None:
+        if not AVAILABLE_PORTS:
+            raise HTTPException(status_code=503, detail="no available ports")
+        while AVAILABLE_PORTS:
+            candidate = AVAILABLE_PORTS.pop()
+            if is_port_free(candidate):
+                port = candidate
+                break
+        if port is None:
+            raise HTTPException(status_code=503, detail="no available ports")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{AGENT_URL}/restart",
+                json={
+                    "app_id": app_id,
+                    "path": run_path,
+                    "type": app_type,
+                    "log_path": log_path,
+                    "port": port,
+                    "allow_ips": allowed,
+                    "auth_header": auth_header,
+                },
+                timeout=5,
+            )
+            resp.raise_for_status()
+        save_status(
+            app_id,
+            "running",
+            log_path,
+            port=port,
+            app_type=app_type,
+            allow_ips=allow_ips_str,
+            auth_header=auth_header,
+        )
+    except Exception as e:
+        AVAILABLE_PORTS.add(port)
+        save_status(
+            app_id,
+            "error",
+            log_path,
+            app_type=app_type,
+            allow_ips=allow_ips_str,
+            auth_header=auth_header,
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"detail": "restarted", "url": f"/apps/{app_id}/"}
 
 
 @app.delete("/apps/{app_id}")
