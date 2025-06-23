@@ -195,6 +195,8 @@ async def build_and_run(req: RunRequest):
             "all",
             "--network",
             "host",
+            "-p",
+            f"{req.port}:{req.port}",
             "-e",
             f"PORT={req.port}",
             "-e",

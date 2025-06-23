@@ -29,3 +29,10 @@ uploads/
 # Misc
 *.log
 .DS_Store
+
+# VS Code
+.vscode/
+
+# Folders
+flagged/
+proxy/
