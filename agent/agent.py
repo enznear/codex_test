@@ -28,6 +28,7 @@ class RunRequest(BaseModel):
     allow_ips: Optional[List[str]] = None
     auth_header: Optional[str] = None
     port: int
+    reuse_image: bool = False
 
 
 
@@ -93,6 +94,15 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     return {"detail": "building"}
 
 
+@app.post("/restart")
+async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
+    """Restart an app using an existing Docker image."""
+    req.reuse_image = True
+    add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    background_tasks.add_task(build_and_run, req)
+    return {"detail": "restarting"}
+
+
 async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
     if not is_port_free(req.port):
@@ -107,19 +117,20 @@ async def build_and_run(req: RunRequest):
             remove_route(req.app_id)
         return
     if req.type == "docker":
-        build_cmd = ["docker", "build", "-t", req.app_id, req.path]
-        ret = await async_run_wait(build_cmd, req.log_path)
-        if ret != 0:
-            try:
-                async with httpx.AsyncClient() as client:
-                    await client.post(
-                        f"{BACKEND_URL}/update_status",
-                        json={"app_id": req.app_id, "status": "error"},
-                        timeout=5,
-                    )
-            finally:
-                remove_route(req.app_id)
-            return
+        if not req.reuse_image:
+            build_cmd = ["docker", "build", "-t", req.app_id, req.path]
+            ret = await async_run_wait(build_cmd, req.log_path)
+            if ret != 0:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{BACKEND_URL}/update_status",
+                            json={"app_id": req.app_id, "status": "error"},
+                            timeout=5,
+                        )
+                finally:
+                    remove_route(req.app_id)
+                return
         run_cmd = [
             "docker",
             "run",
@@ -140,39 +151,42 @@ async def build_and_run(req: RunRequest):
             env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
         )
     elif req.type == "docker_tar":
-        image_tag = None
-        try:
-            import tarfile, json
-
-            with tarfile.open(req.path) as tf:
-                mf = tf.extractfile("manifest.json")
-                if mf:
-                    manifest = json.load(mf)
-                    tags = manifest[0].get("RepoTags")
-                    if tags:
-                        image_tag = tags[0]
-                    else:
-                        cfg = manifest[0].get("Config")
-                        if cfg:
-                            image_tag = cfg.split(".")[0]
-        except Exception:
+        run_image = req.app_id
+        if not req.reuse_image:
             image_tag = None
-
-        load_cmd = ["docker", "load", "-i", req.path]
-        ret = await async_run_wait(load_cmd, req.log_path)
-        if ret != 0:
             try:
-                async with httpx.AsyncClient() as client:
-                    await client.post(
-                        f"{BACKEND_URL}/update_status",
-                        json={"app_id": req.app_id, "status": "error"},
-                        timeout=5,
-                    )
-            finally:
-                remove_route(req.app_id)
-            return
+                import tarfile, json
 
-        run_image = image_tag or req.app_id
+                with tarfile.open(req.path) as tf:
+                    mf = tf.extractfile("manifest.json")
+                    if mf:
+                        manifest = json.load(mf)
+                        tags = manifest[0].get("RepoTags")
+                        if tags:
+                            image_tag = tags[0]
+                        else:
+                            cfg = manifest[0].get("Config")
+                            if cfg:
+                                image_tag = cfg.split(".")[0]
+            except Exception:
+                image_tag = None
+
+            load_cmd = ["docker", "load", "-i", req.path]
+            ret = await async_run_wait(load_cmd, req.log_path)
+            if ret != 0:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{BACKEND_URL}/update_status",
+                            json={"app_id": req.app_id, "status": "error"},
+                            timeout=5,
+                        )
+                finally:
+                    remove_route(req.app_id)
+                return
+
+            if image_tag:
+                await async_run_wait(["docker", "tag", image_tag, req.app_id], req.log_path)
         run_cmd = [
             "docker",
             "run",
