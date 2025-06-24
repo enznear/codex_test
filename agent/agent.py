@@ -121,6 +121,23 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     return {"detail": "restarting"}
 
 
+async def wait_for_http_ready(app_id: str, port: int, proc):
+    """Poll the app until an HTTP response is received then mark running."""
+    url = f"http://127.0.0.1:{port}/"
+    while proc.returncode is None:
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.get(url, timeout=1)
+                await client.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": app_id, "status": "running"},
+                    timeout=5,
+                )
+                return
+        except Exception:
+            await asyncio.sleep(1)
+
+
 async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
     if not is_port_free(req.port):
@@ -254,7 +271,6 @@ async def build_and_run(req: RunRequest):
     PROCESSES[req.app_id] = {"proc": proc, "type": req.type}
     asyncio.create_task(heartbeat_loop(req.app_id))
     asyncio.create_task(wait_for_http_ready(req.app_id, req.port, proc))
-    asyncio.create_task(wait_for_port(req.app_id, req.port, proc))
 
 
 async def wait_for_port(app_id: str, port: int, proc):
