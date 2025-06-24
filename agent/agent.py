@@ -136,7 +136,7 @@ async def build_and_run(req: RunRequest):
         return
     if req.type == "docker":
         if not req.reuse_image:
-            build_cmd = ["docker", "build", "-t", req.app_id, req.path]
+            build_cmd = ["docker", "build", "--network", "host", "-t", req.app_id, req.path]
             ret = await async_run_wait(build_cmd, req.log_path)
             if ret != 0:
                 try:
@@ -153,6 +153,8 @@ async def build_and_run(req: RunRequest):
             "docker",
             "run",
             "--rm",
+            "--gpus",
+            "all",
             "-p",
             f"{req.port}:{req.port}",
             "-e",
@@ -210,9 +212,7 @@ async def build_and_run(req: RunRequest):
             "run",
             "--rm",
             "--gpus",
-            "all",
-            "--network",
-            "host",
+            "all",           
             "-p",
             f"{req.port}:{req.port}",
             "-e",
@@ -253,7 +253,6 @@ async def build_and_run(req: RunRequest):
     # differently for docker vs gradio apps
     PROCESSES[req.app_id] = {"proc": proc, "type": req.type}
     asyncio.create_task(heartbeat_loop(req.app_id))
-
     asyncio.create_task(wait_for_http_ready(req.app_id, req.port, proc))
 
 async def wait_for_http_ready(app_id: str, port: int, proc):
@@ -271,7 +270,6 @@ async def wait_for_http_ready(app_id: str, port: int, proc):
                 return
         except Exception:
             await asyncio.sleep(1)
-
 
 async def heartbeat_loop(app_id: str):
     """Send periodic heartbeats and detect process exit."""
