@@ -151,4 +151,5 @@ You can store reusable app templates and deploy them with a single click.
 
 Any folder placed directly under `./templates` will be automatically registered as a template when the backend starts or when the templates list is fetched.
 
+
 On the frontend the templates are loaded on page load and displayed with a **Deploy** button. Clicking it triggers the deployment endpoint and the running apps list is refreshed automatically.

@@ -431,6 +431,7 @@ async def upload_template(
 @app.get("/templates")
 async def list_templates():
     ensure_templates()
+
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("SELECT id, name, description FROM templates")
