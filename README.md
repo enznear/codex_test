@@ -137,3 +137,18 @@ values are injected into the Nginx location block.
 ## Frontend
 
 A minimal React+Tailwind UI is included in `frontend/index.html`. The backend now serves this file automatically, so simply navigate to `http://localhost:8000` in your browser after starting the backend.
+
+## Templates
+
+You can store reusable app templates and deploy them with a single click.
+
+- `POST /templates` – upload a template archive or folder.
+  - `name`: template name.
+  - `file`: archive or single file containing the template.
+  - `description` (optional): short text shown in the UI.
+- `GET /templates` – list available templates.
+- `POST /deploy_template/{template_id}` – copy the template to the uploads directory and start it just like an uploaded app. The response includes the new `app_id` and URL.
+
+Any folder placed directly under `./templates` will be automatically registered as a template when the backend starts or when the templates list is fetched.
+
+On the frontend the templates are loaded on page load and displayed with a **Deploy** button. Clicking it triggers the deployment endpoint and the running apps list is refreshed automatically.

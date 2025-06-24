@@ -17,6 +17,7 @@ import socket
 DATABASE = "./app.db"
 UPLOAD_DIR = "./uploads"
 LOG_DIR = "./logs"
+TEMPLATE_DIR = "./templates"
 AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8001")
 
 # Port range to allocate for running apps
@@ -55,6 +56,17 @@ def init_db():
         )
         """
     )
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS templates (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            type TEXT,
+            path TEXT,
+            description TEXT
+        )
+        """
+    )
     # Add new columns if database existed before
     c.execute("PRAGMA table_info(apps)")
     cols = [row[1] for row in c.fetchall()]
@@ -72,8 +84,41 @@ def init_db():
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
 init_db()
+
+def ensure_templates():
+    """Scan TEMPLATE_DIR for folders and register them as templates."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM templates")
+    known = {row[0] for row in c.fetchall()}
+    for entry in os.listdir(TEMPLATE_DIR):
+        full = os.path.join(TEMPLATE_DIR, entry)
+        if not os.path.isdir(full) or entry in known:
+            continue
+        app_type = "gradio"
+        stored_path = "."
+        for root, _, files in os.walk(full):
+            for fname in files:
+                if fname.lower().endswith(".tar"):
+                    app_type = "docker_tar"
+                    stored_path = fname
+                    break
+                if fname.lower() == "dockerfile":
+                    app_type = "docker"
+                    break
+            if app_type != "gradio":
+                break
+        c.execute(
+            "INSERT INTO templates(id, name, type, path, description) VALUES(?,?,?,?,?)",
+            (entry, entry, app_type, stored_path, ""),
+        )
+    conn.commit()
+    conn.close()
+
+ensure_templates()
 
 def release_app_port(app_id: str):
     """Return the port used by the app back to the pool."""
@@ -328,6 +373,149 @@ async def upload_app(
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"app_id": app_id, "status": "building", "url": url}
+
+
+@app.post("/templates")
+async def upload_template(
+    name: str = Form(...),
+    file: UploadFile = File(...),
+    description: str = Form("")
+):
+    """Upload a template archive or file."""
+    template_id = str(uuid.uuid4())
+    t_dir = os.path.join(TEMPLATE_DIR, template_id)
+    os.makedirs(t_dir, exist_ok=True)
+    filename = os.path.basename(file.filename)
+    if not ALLOWED_FILENAME.fullmatch(filename):
+        raise HTTPException(status_code=400, detail="invalid filename")
+    file_location = os.path.join(t_dir, filename)
+    with open(file_location, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    if zipfile.is_zipfile(file_location):
+        with zipfile.ZipFile(file_location, "r") as z:
+            for member in z.namelist():
+                if os.path.isabs(member) or ".." in member.split("/"):
+                    raise HTTPException(status_code=400, detail="invalid zip entry path")
+                resolved = os.path.realpath(os.path.join(t_dir, member))
+                if not resolved.startswith(os.path.realpath(t_dir) + os.sep):
+                    raise HTTPException(status_code=400, detail="zip entry outside template directory")
+            z.extractall(t_dir)
+
+    if filename.lower().endswith(".tar"):
+        app_type = "docker_tar"
+        stored_path = filename
+    else:
+        app_type = "gradio"
+        stored_path = "."
+        for root, _, files in os.walk(t_dir):
+            for fname in files:
+                if fname.lower() == "dockerfile":
+                    app_type = "docker"
+                    break
+            if app_type == "docker":
+                break
+
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO templates(id, name, type, path, description) VALUES(?,?,?,?,?)",
+        (template_id, name.strip(), app_type, stored_path, description.strip()),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"template_id": template_id}
+
+
+@app.get("/templates")
+async def list_templates():
+    ensure_templates()
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id, name, description FROM templates")
+    rows = c.fetchall()
+    conn.close()
+    return [
+        {"id": row[0], "name": row[1], "description": row[2] or ""}
+        for row in rows
+    ]
+
+
+@app.post("/deploy_template/{template_id}")
+async def deploy_template(template_id: str):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT name, type, path FROM templates WHERE id=?",
+        (template_id,),
+    )
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="template not found")
+    name, app_type, stored_path = row
+
+    app_id = str(uuid.uuid4())
+    app_dir = os.path.join(UPLOAD_DIR, app_id)
+    shutil.copytree(os.path.join(TEMPLATE_DIR, template_id), app_dir)
+
+    log_path = os.path.join(LOG_DIR, f"{app_id}.log")
+    if not AVAILABLE_PORTS:
+        raise HTTPException(status_code=503, detail="no available ports")
+    port = None
+    while AVAILABLE_PORTS:
+        candidate = AVAILABLE_PORTS.pop()
+        if is_port_free(candidate):
+            port = candidate
+            break
+    if port is None:
+        raise HTTPException(status_code=503, detail="no available ports")
+
+    url = f"/apps/{app_id}/"
+    save_status(
+        app_id,
+        "uploaded",
+        log_path,
+        port=port,
+        name=name,
+        url=url,
+        app_type=app_type,
+    )
+
+    run_path = os.path.join(app_dir, stored_path) if stored_path and stored_path != "." else app_dir
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{AGENT_URL}/run",
+                json={
+                    "app_id": app_id,
+                    "path": run_path,
+                    "type": app_type,
+                    "log_path": log_path,
+                    "port": port,
+                    "allow_ips": None,
+                    "auth_header": None,
+                },
+                timeout=5,
+            )
+            resp.raise_for_status()
+        save_status(app_id, "building", log_path, app_type=app_type)
+    except httpx.ConnectError:
+        AVAILABLE_PORTS.add(port)
+        save_status(app_id, "error", log_path, app_type=app_type)
+        raise HTTPException(status_code=502, detail="Unable to reach agent. Please ensure the agent is running and reachable.")
+    except httpx.TimeoutException:
+        AVAILABLE_PORTS.add(port)
+        save_status(app_id, "error", log_path, app_type=app_type)
+        raise HTTPException(status_code=504, detail="Agent request timed out. Please make sure the agent is running.")
+    except Exception as e:
+        AVAILABLE_PORTS.add(port)
+        save_status(app_id, "error", log_path, app_type=app_type)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"app_id": app_id, "url": url}
 
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
