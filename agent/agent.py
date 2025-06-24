@@ -254,22 +254,29 @@ async def build_and_run(req: RunRequest):
     PROCESSES[req.app_id] = {"proc": proc, "type": req.type}
     asyncio.create_task(heartbeat_loop(req.app_id))
     asyncio.create_task(wait_for_http_ready(req.app_id, req.port, proc))
+    asyncio.create_task(wait_for_port(req.app_id, req.port, proc))
 
-async def wait_for_http_ready(app_id: str, port: int, proc):
-    """Poll the app until an HTTP response is received then mark running."""
-    url = f"http://127.0.0.1:{port}/"
+
+async def wait_for_port(app_id: str, port: int, proc):
+    """Wait until the given port accepts connections then mark running."""
     while proc.returncode is None:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            async with httpx.AsyncClient() as client:
-                await client.get(url, timeout=1)
-                await client.post(
-                    f"{BACKEND_URL}/update_status",
-                    json={"app_id": app_id, "status": "running"},
-                    timeout=5,
-                )
+            s.settimeout(1)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{BACKEND_URL}/update_status",
+                            json={"app_id": app_id, "status": "running"},
+                            timeout=5,
+                        )
+                except Exception:
+                    pass
                 return
-        except Exception:
-            await asyncio.sleep(1)
+        finally:
+            s.close()
+        await asyncio.sleep(1)
 
 async def heartbeat_loop(app_id: str):
     """Send periodic heartbeats and detect process exit."""
