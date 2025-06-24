@@ -281,7 +281,7 @@ async def upload_app(
             resp.raise_for_status()
         save_status(
             app_id,
-            "running",
+            "building",
             log_path,
             app_type=app_type,
             allow_ips=allowed_str,
@@ -327,7 +327,7 @@ async def upload_app(
         )
         raise HTTPException(status_code=500, detail=str(e))
 
-    return {"app_id": app_id, "status": "running", "url": url}
+    return {"app_id": app_id, "status": "building", "url": url}
 
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
@@ -478,7 +478,7 @@ async def restart_app(app_id: str):
             resp.raise_for_status()
         save_status(
             app_id,
-            "running",
+            "building",
             log_path,
             port=port,
             app_type=app_type,
@@ -497,7 +497,7 @@ async def restart_app(app_id: str):
         )
         raise HTTPException(status_code=500, detail=str(e))
 
-    return {"detail": "restarted", "url": f"/apps/{app_id}/"}
+    return {"detail": "restarting", "url": f"/apps/{app_id}/"}
 
 
 @app.delete("/apps/{app_id}")
