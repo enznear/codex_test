@@ -78,6 +78,7 @@
         formData.append('file', files[0]);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/upload');
+        setUploadMsg('Upload started');
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             setUploadProgress(Math.round((event.loaded / event.total) * 100));
@@ -88,7 +89,7 @@
           try { data = JSON.parse(xhr.responseText); } catch (e) {}
           setUploadProgress(0);
           if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadMsg('Upload started: ' + (data.app_id || ''));
+            setUploadMsg('Upload finished: ' + (data.app_id || ''));
             setName('');
             setDescription('');
             setRunType('gradio');
