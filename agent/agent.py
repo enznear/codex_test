@@ -136,7 +136,7 @@ async def build_and_run(req: RunRequest):
         return
     if req.type == "docker":
         if not req.reuse_image:
-            build_cmd = ["docker", "build", "-t", req.app_id, req.path]
+            build_cmd = ["docker", "build", "--network", "host", "-t", req.app_id, req.path]
             ret = await async_run_wait(build_cmd, req.log_path)
             if ret != 0:
                 try:
@@ -153,6 +153,8 @@ async def build_and_run(req: RunRequest):
             "docker",
             "run",
             "--rm",
+            "--gpus",
+            "all",
             "-p",
             f"{req.port}:{req.port}",
             "-e",
@@ -210,9 +212,7 @@ async def build_and_run(req: RunRequest):
             "run",
             "--rm",
             "--gpus",
-            "all",
-            "--network",
-            "host",
+            "all",           
             "-p",
             f"{req.port}:{req.port}",
             "-e",
