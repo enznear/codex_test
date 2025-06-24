@@ -90,6 +90,15 @@ async def async_run_detached(cmd, log_path, env=None):
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     # configure the proxy for the assigned port and start build/run in background
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{BACKEND_URL}/update_status",
+                json={"app_id": req.app_id, "status": "building"},
+                timeout=5,
+            )
+    except Exception:
+        pass
     background_tasks.add_task(build_and_run, req)
     return {"detail": "building"}
 
@@ -99,6 +108,15 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     """Restart an app using an existing Docker image."""
     req.reuse_image = True
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{BACKEND_URL}/update_status",
+                json={"app_id": req.app_id, "status": "building"},
+                timeout=5,
+            )
+    except Exception:
+        pass
     background_tasks.add_task(build_and_run, req)
     return {"detail": "restarting"}
 
