@@ -59,6 +59,9 @@ def generate_config(routes):
         lines.append("        proxy_set_header Upgrade $http_upgrade;")
         lines.append('        proxy_set_header Connection "upgrade";')
         lines.append("        proxy_set_header Host $host;")
+        lines.append("        proxy_set_header X-Real-IP $remote_addr;")
+        lines.append("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;")
+        lines.append("        proxy_set_header X-Forwarded-Proto $scheme;")
         if info.get("allow_ips"):
             for ip in info["allow_ips"]:
                 lines.append(f"        allow {ip};")
