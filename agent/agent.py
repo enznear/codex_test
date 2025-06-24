@@ -90,6 +90,15 @@ async def async_run_detached(cmd, log_path, env=None):
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     # configure the proxy for the assigned port and start build/run in background
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{BACKEND_URL}/update_status",
+                json={"app_id": req.app_id, "status": "building"},
+                timeout=5,
+            )
+    except Exception:
+        pass
     background_tasks.add_task(build_and_run, req)
     return {"detail": "building"}
 
@@ -99,6 +108,15 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     """Restart an app using an existing Docker image."""
     req.reuse_image = True
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{BACKEND_URL}/update_status",
+                json={"app_id": req.app_id, "status": "building"},
+                timeout=5,
+            )
+    except Exception:
+        pass
     background_tasks.add_task(build_and_run, req)
     return {"detail": "restarting"}
 
@@ -236,16 +254,29 @@ async def build_and_run(req: RunRequest):
     PROCESSES[req.app_id] = {"proc": proc, "type": req.type}
     asyncio.create_task(heartbeat_loop(req.app_id))
 
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "running"},
-                timeout=5,
-            )
-    except Exception:
-        pass
+    asyncio.create_task(wait_for_port(req.app_id, req.port, proc))
 
+
+async def wait_for_port(app_id: str, port: int, proc):
+    """Wait until the given port accepts connections then mark running."""
+    while proc.returncode is None:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.settimeout(1)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{BACKEND_URL}/update_status",
+                            json={"app_id": app_id, "status": "running"},
+                            timeout=5,
+                        )
+                except Exception:
+                    pass
+                return
+        finally:
+            s.close()
+        await asyncio.sleep(1)
 
 
 async def heartbeat_loop(app_id: str):
