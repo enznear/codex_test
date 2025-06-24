@@ -88,6 +88,38 @@ def init_db():
 
 init_db()
 
+def ensure_templates():
+    """Scan TEMPLATE_DIR for folders and register them as templates."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM templates")
+    known = {row[0] for row in c.fetchall()}
+    for entry in os.listdir(TEMPLATE_DIR):
+        full = os.path.join(TEMPLATE_DIR, entry)
+        if not os.path.isdir(full) or entry in known:
+            continue
+        app_type = "gradio"
+        stored_path = "."
+        for root, _, files in os.walk(full):
+            for fname in files:
+                if fname.lower().endswith(".tar"):
+                    app_type = "docker_tar"
+                    stored_path = fname
+                    break
+                if fname.lower() == "dockerfile":
+                    app_type = "docker"
+                    break
+            if app_type != "gradio":
+                break
+        c.execute(
+            "INSERT INTO templates(id, name, type, path, description) VALUES(?,?,?,?,?)",
+            (entry, entry, app_type, stored_path, ""),
+        )
+    conn.commit()
+    conn.close()
+
+ensure_templates()
+
 def release_app_port(app_id: str):
     """Return the port used by the app back to the pool."""
     conn = sqlite3.connect(DATABASE)
@@ -398,6 +430,8 @@ async def upload_template(
 
 @app.get("/templates")
 async def list_templates():
+    ensure_templates()
+
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("SELECT id, name, description FROM templates")
