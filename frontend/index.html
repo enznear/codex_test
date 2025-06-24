@@ -60,6 +60,13 @@
         }, 2000);
       };
 
+      useEffect(() => {
+        const interval = setInterval(() => {
+          refreshStatus();
+        }, 2000);
+        return () => clearInterval(interval);
+      }, []);
+
       const handleUpload = (e) => {
         e.preventDefault();
         if (files.length === 0) return;
