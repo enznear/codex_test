@@ -27,6 +27,7 @@
       const [showLogs, setShowLogs] = useState({});
       const [uploadMsg, setUploadMsg] = useState('');
       const [uploadProgress, setUploadProgress] = useState(0);
+      const [templates, setTemplates] = useState([]);
 
       useEffect(() => {
         fetch('/status')
@@ -34,6 +35,10 @@
           .then(data => {
             setApps(data);
           })
+          .catch(() => {});
+        fetch('/templates')
+          .then(res => res.json())
+          .then(data => setTemplates(data))
           .catch(() => {});
       }, []);
 
@@ -149,6 +154,14 @@
           .catch(() => {});
       };
 
+      const deployTemplate = (id) => {
+        fetch(`/deploy_template/${id}`, { method: 'POST' })
+          .then(() => {
+            refreshStatus();
+          })
+          .catch(() => {});
+      };
+
       return (
         <div>
           <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
@@ -180,6 +193,19 @@
             </div>
           )}
           {uploadMsg && <p className="text-sm mt-2">{uploadMsg}</p>}
+
+          <div className="bg-white p-4 rounded shadow mb-4">
+            <h2 className="text-xl font-bold mb-2">Templates</h2>
+            {templates.map(t => (
+              <div key={t.id} className="flex justify-between items-center mb-2">
+                <div>
+                  <p className="font-semibold">{t.name}</p>
+                  <p className="text-sm text-gray-600">{t.description}</p>
+                </div>
+                <button onClick={() => deployTemplate(t.id)} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Deploy</button>
+              </div>
+            ))}
+          </div>
 
           <div className="grid gap-4">
             {apps.map(app => (
