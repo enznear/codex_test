@@ -331,7 +331,8 @@ async def upload_app(
 
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
-    save_status(update.app_id, update.status)
+    heartbeat_time = time.time() if update.status == "running" else None
+    save_status(update.app_id, update.status, heartbeat=heartbeat_time)
     if update.status in ("error", "finished", "stopped"):
         release_app_port(update.app_id)
     return {"detail": "ok"}
