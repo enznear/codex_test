@@ -20,8 +20,8 @@ app = FastAPI()
 
 PROCESSES = {}
 
+def get_available_gpu() -> Optional[int]:
 
-def get_available_gpu() -> int:
     """Return an available GPU index based on memory usage."""
     used: Set[int] = {info.get("gpu") for info in PROCESSES.values() if info.get("gpu") is not None}
     try:
@@ -47,8 +47,9 @@ def get_available_gpu() -> int:
             candidates.sort()
             return candidates[0][1]
     except Exception:
-        pass
-    return 0
+        return None
+    return None
+
 
 class RunRequest(BaseModel):
     app_id: str
@@ -122,6 +123,19 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     # configure the proxy for the assigned port and start build/run in background
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
     gpu = get_available_gpu()
+    if gpu is None:
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": req.app_id, "status": "error", "gpu": None},
+                    timeout=5,
+                )
+        except Exception:
+            pass
+        remove_route(req.app_id)
+        raise HTTPException(status_code=500, detail="No available GPU")
+
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
@@ -142,6 +156,19 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     req.reuse_image = True
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
     gpu = get_available_gpu()
+    if gpu is None:
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": req.app_id, "status": "error", "gpu": None},
+                    timeout=5,
+                )
+        except Exception:
+            pass
+        remove_route(req.app_id)
+        raise HTTPException(status_code=500, detail="No available GPU")
+
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
@@ -178,6 +205,18 @@ async def wait_for_http_ready(app_id: str, port: int, proc):
 async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
     gpu = req.gpu if req.gpu is not None else get_available_gpu()
+    if gpu is None:
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/update_status",
+                    json={"app_id": req.app_id, "status": "error", "gpu": None},
+                    timeout=5,
+                )
+        finally:
+            remove_route(req.app_id)
+        return
+
     if not is_port_free(req.port):
         try:
             async with httpx.AsyncClient() as client:
@@ -208,12 +247,19 @@ async def build_and_run(req: RunRequest):
             "docker",
             "run",
             "--rm",
-            "--gpus",
-            f"device={gpu}",
+        ]
+        if gpu is not None:
+            run_cmd += ["--gpus", f"device={gpu}"]
+        run_cmd += [
+
             "-p",
             f"{req.port}:{req.port}",
             "-e",
             f"PORT={req.port}",
+        ]
+        if gpu is not None:
+            run_cmd += ["-e", f"CUDA_VISIBLE_DEVICES={gpu}"]
+        run_cmd += [
             "-e",
             f"CUDA_VISIBLE_DEVICES={gpu}",
             "-e",
@@ -228,7 +274,8 @@ async def build_and_run(req: RunRequest):
             env={
                 "PORT": str(req.port),
                 "ROOT_PATH": f"/apps/{req.app_id}",
-                "CUDA_VISIBLE_DEVICES": str(gpu),
+                **({"CUDA_VISIBLE_DEVICES": str(gpu)} if gpu is not None else {}),
+
             },
         )
     elif req.type == "docker_tar":
@@ -272,12 +319,19 @@ async def build_and_run(req: RunRequest):
             "docker",
             "run",
             "--rm",
-            "--gpus",
-            f"device={gpu}",
+        ]
+        if gpu is not None:
+            run_cmd += ["--gpus", f"device={gpu}"]
+        run_cmd += [
+
             "-p",
             f"{req.port}:{req.port}",
             "-e",
             f"PORT={req.port}",
+        ]
+        if gpu is not None:
+            run_cmd += ["-e", f"CUDA_VISIBLE_DEVICES={gpu}"]
+        run_cmd += [
             "-e",
             f"CUDA_VISIBLE_DEVICES={gpu}",
             "-e",
@@ -292,7 +346,8 @@ async def build_and_run(req: RunRequest):
             env={
                 "PORT": str(req.port),
                 "ROOT_PATH": f"/apps/{req.app_id}",
-                "CUDA_VISIBLE_DEVICES": str(gpu),
+                **({"CUDA_VISIBLE_DEVICES": str(gpu)} if gpu is not None else {}),
+
             },
         )
     else:  # gradio
@@ -316,7 +371,8 @@ async def build_and_run(req: RunRequest):
             env={
                 "PORT": str(req.port),
                 "ROOT_PATH": f"/apps/{req.app_id}",
-                "CUDA_VISIBLE_DEVICES": str(gpu),
+                **({"CUDA_VISIBLE_DEVICES": str(gpu)} if gpu is not None else {}),
+
             },
         )
 
