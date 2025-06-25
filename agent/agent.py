@@ -7,7 +7,7 @@ import sys
 import httpx
 import asyncio
 import socket
-from typing import List, Optional
+from typing import List, Optional, Set
 from proxy.proxy import add_route, remove_route
 import threading
 import time
@@ -20,6 +20,36 @@ app = FastAPI()
 
 PROCESSES = {}
 
+
+def get_available_gpu() -> int:
+    """Return an available GPU index based on memory usage."""
+    used: Set[int] = {info.get("gpu") for info in PROCESSES.values() if info.get("gpu") is not None}
+    try:
+        output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=index,memory.used",
+                "--format=csv,noheader,nounits",
+            ],
+            encoding="utf-8",
+        )
+        candidates = []
+        for line in output.splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) != 2:
+                continue
+            idx = int(parts[0])
+            mem = int(parts[1])
+            if idx in used:
+                mem += 10**9  # discourage assigning used GPU
+            candidates.append((mem, idx))
+        if candidates:
+            candidates.sort()
+            return candidates[0][1]
+    except Exception:
+        pass
+    return 0
+
 class RunRequest(BaseModel):
     app_id: str
     path: str
@@ -29,6 +59,7 @@ class RunRequest(BaseModel):
     auth_header: Optional[str] = None
     port: int
     reuse_image: bool = False
+    gpu: Optional[int] = None
 
 
 
@@ -90,15 +121,17 @@ async def async_run_detached(cmd, log_path, env=None):
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     # configure the proxy for the assigned port and start build/run in background
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    gpu = get_available_gpu()
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
                 f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "building"},
+                json={"app_id": req.app_id, "status": "building", "gpu": gpu},
                 timeout=5,
             )
     except Exception:
         pass
+    req.gpu = gpu  # type: ignore
     background_tasks.add_task(build_and_run, req)
     return {"detail": "building"}
 
@@ -108,15 +141,17 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     """Restart an app using an existing Docker image."""
     req.reuse_image = True
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
+    gpu = get_available_gpu()
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
                 f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "building"},
+                json={"app_id": req.app_id, "status": "building", "gpu": gpu},
                 timeout=5,
             )
     except Exception:
         pass
+    req.gpu = gpu  # type: ignore
     background_tasks.add_task(build_and_run, req)
     return {"detail": "restarting"}
 
@@ -128,9 +163,11 @@ async def wait_for_http_ready(app_id: str, port: int, proc):
         try:
             async with httpx.AsyncClient() as client:
                 await client.get(url, timeout=1)
+                entry = PROCESSES.get(app_id)
+                gpu = entry.get("gpu") if entry else None
                 await client.post(
                     f"{BACKEND_URL}/update_status",
-                    json={"app_id": app_id, "status": "running"},
+                    json={"app_id": app_id, "status": "running", "gpu": gpu},
                     timeout=5,
                 )
                 return
@@ -140,12 +177,13 @@ async def wait_for_http_ready(app_id: str, port: int, proc):
 
 async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
+    gpu = req.gpu if req.gpu is not None else get_available_gpu()
     if not is_port_free(req.port):
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(
                     f"{BACKEND_URL}/update_status",
-                    json={"app_id": req.app_id, "status": "error"},
+                    json={"app_id": req.app_id, "status": "error", "gpu": None},
                     timeout=5,
                 )
         finally:
@@ -171,11 +209,13 @@ async def build_and_run(req: RunRequest):
             "run",
             "--rm",
             "--gpus",
-            "all",
+            f"device={gpu}",
             "-p",
             f"{req.port}:{req.port}",
             "-e",
             f"PORT={req.port}",
+            "-e",
+            f"CUDA_VISIBLE_DEVICES={gpu}",
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
             "--name",
@@ -185,7 +225,11 @@ async def build_and_run(req: RunRequest):
         proc = await async_run_detached(
             run_cmd,
             req.log_path,
-            env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
+            env={
+                "PORT": str(req.port),
+                "ROOT_PATH": f"/apps/{req.app_id}",
+                "CUDA_VISIBLE_DEVICES": str(gpu),
+            },
         )
     elif req.type == "docker_tar":
         run_image = req.app_id
@@ -229,11 +273,13 @@ async def build_and_run(req: RunRequest):
             "run",
             "--rm",
             "--gpus",
-            "all",           
+            f"device={gpu}",
             "-p",
             f"{req.port}:{req.port}",
             "-e",
             f"PORT={req.port}",
+            "-e",
+            f"CUDA_VISIBLE_DEVICES={gpu}",
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
             "--name",
@@ -243,7 +289,11 @@ async def build_and_run(req: RunRequest):
         proc = await async_run_detached(
             run_cmd,
             req.log_path,
-            env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
+            env={
+                "PORT": str(req.port),
+                "ROOT_PATH": f"/apps/{req.app_id}",
+                "CUDA_VISIBLE_DEVICES": str(gpu),
+            },
         )
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
@@ -263,12 +313,16 @@ async def build_and_run(req: RunRequest):
         proc = await async_run_detached(
             cmd,
             req.log_path,
-            env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"},
+            env={
+                "PORT": str(req.port),
+                "ROOT_PATH": f"/apps/{req.app_id}",
+                "CUDA_VISIBLE_DEVICES": str(gpu),
+            },
         )
 
     # Store the process along with the type so that cleanup can behave
     # differently for docker vs gradio apps
-    PROCESSES[req.app_id] = {"proc": proc, "type": req.type}
+    PROCESSES[req.app_id] = {"proc": proc, "type": req.type, "gpu": gpu}
     asyncio.create_task(heartbeat_loop(req.app_id))
     asyncio.create_task(wait_for_http_ready(req.app_id, req.port, proc))
 
@@ -305,7 +359,7 @@ async def heartbeat_loop(app_id: str):
                 async with httpx.AsyncClient() as client:
                     await client.post(
                         f"{BACKEND_URL}/update_status",
-                        json={"app_id": app_id, "status": status},
+                        json={"app_id": app_id, "status": status, "gpu": None},
                         timeout=5,
                     )
             except Exception:
@@ -361,7 +415,7 @@ async def stop_app(req: StopRequest):
         async with httpx.AsyncClient() as client:
             await client.post(
                 f"{BACKEND_URL}/update_status",
-                json={"app_id": req.app_id, "status": "stopped"},
+                json={"app_id": req.app_id, "status": "stopped", "gpu": None},
                 timeout=5,
             )
     except Exception:
