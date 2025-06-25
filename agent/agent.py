@@ -257,8 +257,6 @@ async def build_and_run(req: RunRequest):
             "-e",
             f"PORT={req.port}",
         ]
-        if gpu is not None:
-            run_cmd += ["-e", f"CUDA_VISIBLE_DEVICES={gpu}"]
         run_cmd += [
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
@@ -272,7 +270,6 @@ async def build_and_run(req: RunRequest):
             env={
                 "PORT": str(req.port),
                 "ROOT_PATH": f"/apps/{req.app_id}",
-                **({"CUDA_VISIBLE_DEVICES": str(gpu)} if gpu is not None else {}),
 
             },
         )
@@ -327,8 +324,6 @@ async def build_and_run(req: RunRequest):
             "-e",
             f"PORT={req.port}",
         ]
-        if gpu is not None:
-            run_cmd += ["-e", f"CUDA_VISIBLE_DEVICES={gpu}"]
         run_cmd += [
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
@@ -342,7 +337,6 @@ async def build_and_run(req: RunRequest):
             env={
                 "PORT": str(req.port),
                 "ROOT_PATH": f"/apps/{req.app_id}",
-                **({"CUDA_VISIBLE_DEVICES": str(gpu)} if gpu is not None else {}),
 
             },
         )
@@ -367,7 +361,6 @@ async def build_and_run(req: RunRequest):
             env={
                 "PORT": str(req.port),
                 "ROOT_PATH": f"/apps/{req.app_id}",
-                **({"CUDA_VISIBLE_DEVICES": str(gpu)} if gpu is not None else {}),
 
             },
         )
