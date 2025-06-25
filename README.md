@@ -79,6 +79,11 @@ uvicorn agent.agent:app --port 8001
 
 The agent builds and runs Docker or Gradio apps and reports status back to the backend. It can also load images from tar archives and launch them with GPU access.
 
+When launching Docker images manually, ensure GPU access is enabled. Install the
+`nvidia-container-toolkit` and run containers with `--gpus all` (or
+`--runtime=nvidia` on older Docker versions) so frameworks like PyTorch can find
+CUDA.
+
 The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps should listen on the port indicated by this variable. The proxy now rewrites incoming requests so frameworks like Gradio no longer need a `root_path` argument. The agent still sets `ROOT_PATH` for compatibility, but it can be ignored.
 
 During upload the backend now verifies that the chosen port is free by briefly
