@@ -214,6 +214,9 @@
                   <div>
                     <h2 className="font-semibold">{app.id}</h2>
                     <p className="text-sm text-gray-600">Status: {app.status}</p>
+                    {app.gpu !== null && app.gpu !== undefined && (
+                      <p className="text-sm text-gray-600">GPU: {app.gpu}</p>
+                    )}
                     {app.url && (
                       <a href={`${nginxBase}${app.url}`} target="_blank" rel="noopener" className="text-blue-600 text-sm underline">Open</a>
                     )}
