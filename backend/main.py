@@ -52,7 +52,8 @@ def init_db():
             last_heartbeat REAL,
             url TEXT,
             allow_ips TEXT,
-            auth_header TEXT
+            auth_header TEXT,
+            gpu INTEGER
         )
         """
     )
@@ -80,6 +81,8 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN allow_ips TEXT")
     if "auth_header" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN auth_header TEXT")
+    if "gpu" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN gpu INTEGER")
     conn.commit()
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -146,6 +149,7 @@ def is_port_free(port: int) -> bool:
 class StatusUpdate(BaseModel):
     app_id: str
     status: str
+    gpu: int | None = None
 
 class Heartbeat(BaseModel):
     app_id: str
@@ -164,6 +168,7 @@ def save_status(
     app_type: str = None,
     allow_ips: str = None,
     auth_header: str = None,
+    gpu: int = None,
 ):
 
     conn = sqlite3.connect(DATABASE)
@@ -200,12 +205,15 @@ def save_status(
         if auth_header is not None:
             fields.append("auth_header=?")
             values.append(auth_header)
+        if gpu is not None:
+            fields.append("gpu=?")
+            values.append(gpu)
         if fields:
             values.append(app_id)
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpu) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             (
                 app_id,
                 name or app_id,
@@ -217,6 +225,7 @@ def save_status(
                 url,
                 allow_ips,
                 auth_header,
+                gpu,
             ),
 
         )
@@ -521,7 +530,7 @@ async def deploy_template(template_id: str):
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
     heartbeat_time = time.time() if update.status == "running" else None
-    save_status(update.app_id, update.status, heartbeat=heartbeat_time)
+    save_status(update.app_id, update.status, heartbeat=heartbeat_time, gpu=update.gpu)
     if update.status in ("error", "finished", "stopped"):
         release_app_port(update.app_id)
     return {"detail": "ok"}
@@ -564,22 +573,27 @@ async def _stop_agent_and_update_status(app_id: str):
         # Log this error or handle it more gracefully
         # For now, we'll proceed to update status to avoid app being stuck in "stopping"
         print(f"Error stopping agent for {app_id}: {e}")
-        save_status(app_id, "error") # Or a more specific error status
+        save_status(app_id, "error", gpu=None) # Or a more specific error status
         release_app_port(app_id)
         return
 
-    save_status(app_id, "stopped")
+    save_status(app_id, "stopped", gpu=None)
     release_app_port(app_id)
 
 @app.get("/status")
 async def get_status():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, status, url FROM apps")
+    c.execute("SELECT id, status, url, gpu FROM apps")
     rows = c.fetchall()
     conn.close()
     return [
-        {"id": row[0], "status": row[1], "url": row[2] or f"/apps/{row[0]}/"}
+        {
+            "id": row[0],
+            "status": row[1],
+            "url": row[2] or f"/apps/{row[0]}/",
+            "gpu": row[3],
+        }
         for row in rows
     ]
 
@@ -753,7 +767,7 @@ async def cleanup_task():
         )
         stale = [row[0] for row in c.fetchall()]
         for app_id in stale:
-            c.execute("UPDATE apps SET status='error' WHERE id=?", (app_id,))
+            c.execute("UPDATE apps SET status='error', gpu=NULL WHERE id=?", (app_id,))
             conn.commit()
             release_app_port(app_id)
             # Attempt to stop the app on the agent so lingering processes and
