@@ -261,8 +261,6 @@ async def build_and_run(req: RunRequest):
             run_cmd += ["-e", f"CUDA_VISIBLE_DEVICES={gpu}"]
         run_cmd += [
             "-e",
-            f"CUDA_VISIBLE_DEVICES={gpu}",
-            "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
             "--name",
             req.app_id,
@@ -332,8 +330,6 @@ async def build_and_run(req: RunRequest):
         if gpu is not None:
             run_cmd += ["-e", f"CUDA_VISIBLE_DEVICES={gpu}"]
         run_cmd += [
-            "-e",
-            f"CUDA_VISIBLE_DEVICES={gpu}",
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
             "--name",
