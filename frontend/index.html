@@ -21,6 +21,7 @@
       const [name, setName] = useState('');
       const [description, setDescription] = useState('');
       const [runType, setRunType] = useState('gradio');
+      const [vramRequired, setVramRequired] = useState('0');
       const [files, setFiles] = useState([]);
       const [apps, setApps] = useState([]);
       const [logs, setLogs] = useState({});
@@ -81,6 +82,7 @@
         const formData = new FormData();
         formData.append('name', name);
         formData.append('file', files[0]);
+        formData.append('vram_required', vramRequired);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/upload');
         setUploadMsg('Upload started');
@@ -98,6 +100,7 @@
             setName('');
             setDescription('');
             setRunType('gradio');
+            setVramRequired('0');
             setFiles([]);
             refreshStatus();
           } else {
@@ -182,6 +185,10 @@
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="vram">Expected VRAM (MB)</label>
+              <input id="vram" type="number" className="mt-1 p-2 border rounded w-full" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700" htmlFor="file">Upload File</label>
               <input id="file" type="file" className="mt-1 p-2 border rounded w-full" onChange={e => setFiles(e.target.files)} multiple />
             </div>
@@ -212,7 +219,8 @@
               <div key={app.id} className="bg-white p-4 rounded shadow">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h2 className="font-semibold">{app.id}</h2>
+                    <h2 className="font-semibold">{app.name || app.id}</h2>
+                    <p className="text-xs text-gray-500">ID: {app.id}</p>
                     <p className="text-sm text-gray-600">Status: {app.status}</p>
                     {app.gpu !== null && app.gpu !== undefined && (
                       <p className="text-sm text-gray-600">GPU: {app.gpu}</p>
