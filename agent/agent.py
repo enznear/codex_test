@@ -7,7 +7,7 @@ import sys
 import httpx
 import asyncio
 import socket
-from typing import List, Optional, Set
+from typing import List, Optional
 from proxy.proxy import add_route, remove_route
 import threading
 import time
@@ -20,11 +20,9 @@ app = FastAPI()
 
 PROCESSES = {}
 
-
 def get_available_gpu(required: int = 0) -> Optional[int]:
 
-    """Return an available GPU index based on memory usage."""
-    used: Set[int] = {info.get("gpu") for info in PROCESSES.values() if info.get("gpu") is not None}
+    """Return the first GPU index with enough free memory."""
     try:
         output = subprocess.check_output(
             [
@@ -43,12 +41,12 @@ def get_available_gpu(required: int = 0) -> Optional[int]:
             total = int(parts[1])
             used_mem = int(parts[2])
             free = total - used_mem
-            if free < required:
-                continue
-            candidates.append((free, idx))
-        if candidates:
-            candidates.sort(reverse=True)
-            return candidates[0][1]
+            candidates.append((idx, free))
+        candidates.sort(key=lambda t: t[0])
+        for idx, free in candidates:
+            if free >= required:
+                return idx
+
     except Exception:
         return None
     return None
