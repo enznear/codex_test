@@ -20,7 +20,8 @@ app = FastAPI()
 
 PROCESSES = {}
 
-def get_available_gpu() -> Optional[int]:
+
+def get_available_gpu(required: int = 0) -> Optional[int]:
 
     """Return an available GPU index based on memory usage."""
     used: Set[int] = {info.get("gpu") for info in PROCESSES.values() if info.get("gpu") is not None}
@@ -28,7 +29,7 @@ def get_available_gpu() -> Optional[int]:
         output = subprocess.check_output(
             [
                 "nvidia-smi",
-                "--query-gpu=index,memory.used",
+                "--query-gpu=index,memory.total,memory.used",
                 "--format=csv,noheader,nounits",
             ],
             encoding="utf-8",
@@ -36,15 +37,17 @@ def get_available_gpu() -> Optional[int]:
         candidates = []
         for line in output.splitlines():
             parts = [p.strip() for p in line.split(",")]
-            if len(parts) != 2:
+            if len(parts) != 3:
                 continue
             idx = int(parts[0])
-            mem = int(parts[1])
-            if idx in used:
-                mem += 10**9  # discourage assigning used GPU
-            candidates.append((mem, idx))
+            total = int(parts[1])
+            used_mem = int(parts[2])
+            free = total - used_mem
+            if free < required:
+                continue
+            candidates.append((free, idx))
         if candidates:
-            candidates.sort()
+            candidates.sort(reverse=True)
             return candidates[0][1]
     except Exception:
         return None
@@ -61,6 +64,7 @@ class RunRequest(BaseModel):
     port: int
     reuse_image: bool = False
     gpu: Optional[int] = None
+    vram_required: int = 0
 
 
 
@@ -122,7 +126,7 @@ async def async_run_detached(cmd, log_path, env=None):
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     # configure the proxy for the assigned port and start build/run in background
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
-    gpu = get_available_gpu()
+    gpu = get_available_gpu(req.vram_required)
     if gpu is None:
         try:
             async with httpx.AsyncClient() as client:
@@ -155,7 +159,7 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     """Restart an app using an existing Docker image."""
     req.reuse_image = True
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
-    gpu = get_available_gpu()
+    gpu = get_available_gpu(req.vram_required)
     if gpu is None:
         try:
             async with httpx.AsyncClient() as client:
@@ -204,7 +208,7 @@ async def wait_for_http_ready(app_id: str, port: int, proc):
 
 async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
-    gpu = req.gpu if req.gpu is not None else get_available_gpu()
+    gpu = req.gpu if req.gpu is not None else get_available_gpu(req.vram_required)
     if gpu is None:
         try:
             async with httpx.AsyncClient() as client:
@@ -367,7 +371,7 @@ async def build_and_run(req: RunRequest):
 
     # Store the process along with the type so that cleanup can behave
     # differently for docker vs gradio apps
-    PROCESSES[req.app_id] = {"proc": proc, "type": req.type, "gpu": gpu}
+    PROCESSES[req.app_id] = {"proc": proc, "type": req.type, "gpu": gpu, "vram_required": req.vram_required}
     asyncio.create_task(heartbeat_loop(req.app_id))
     asyncio.create_task(wait_for_http_ready(req.app_id, req.port, proc))
 

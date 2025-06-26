@@ -53,7 +53,8 @@ def init_db():
             url TEXT,
             allow_ips TEXT,
             auth_header TEXT,
-            gpu INTEGER
+            gpu INTEGER,
+            vram_required INTEGER
         )
         """
     )
@@ -83,6 +84,8 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN auth_header TEXT")
     if "gpu" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN gpu INTEGER")
+    if "vram_required" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN vram_required INTEGER")
     conn.commit()
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -169,6 +172,7 @@ def save_status(
     allow_ips: str = None,
     auth_header: str = None,
     gpu: int = None,
+    vram_required: int = None,
 ):
 
     conn = sqlite3.connect(DATABASE)
@@ -208,12 +212,15 @@ def save_status(
         if gpu is not None:
             fields.append("gpu=?")
             values.append(gpu)
+        if vram_required is not None:
+            fields.append("vram_required=?")
+            values.append(vram_required)
         if fields:
             values.append(app_id)
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpu) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpu, vram_required) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 app_id,
                 name or app_id,
@@ -226,6 +233,7 @@ def save_status(
                 allow_ips,
                 auth_header,
                 gpu,
+                vram_required,
             ),
 
         )
@@ -238,6 +246,7 @@ async def upload_app(
     file: UploadFile = File(...),
     allow_ips: str = Form(None),
     auth_header: str = Form(None),
+    vram_required: int = Form(0),
 ):
 
     """Receive user uploaded app and trigger agent build/run."""
@@ -310,6 +319,7 @@ async def upload_app(
         app_type=app_type,
         allow_ips=allowed_str,
         auth_header=auth_header,
+        vram_required=vram_required,
     )
 
 
@@ -329,6 +339,7 @@ async def upload_app(
                     "port": port,
                     "allow_ips": allowed,
                     "auth_header": auth_header,
+                    "vram_required": vram_required,
                 },
                 timeout=5,
             )
@@ -340,6 +351,7 @@ async def upload_app(
             app_type=app_type,
             allow_ips=allowed_str,
             auth_header=auth_header,
+            vram_required=vram_required,
         )
     except httpx.ConnectError:
         AVAILABLE_PORTS.add(port)
@@ -350,6 +362,7 @@ async def upload_app(
             app_type=app_type,
             allow_ips=allowed_str,
             auth_header=auth_header,
+            vram_required=vram_required,
         )
         raise HTTPException(
             status_code=502,
@@ -364,6 +377,7 @@ async def upload_app(
             app_type=app_type,
             allow_ips=allowed_str,
             auth_header=auth_header,
+            vram_required=vram_required,
         )
         raise HTTPException(
             status_code=504,
@@ -378,6 +392,7 @@ async def upload_app(
             app_type=app_type,
             allow_ips=allowed_str,
             auth_header=auth_header,
+            vram_required=vram_required,
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -453,7 +468,7 @@ async def list_templates():
 
 
 @app.post("/deploy_template/{template_id}")
-async def deploy_template(template_id: str):
+async def deploy_template(template_id: str, vram_required: int = Form(0)):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute(
@@ -491,6 +506,7 @@ async def deploy_template(template_id: str):
         name=name,
         url=url,
         app_type=app_type,
+        vram_required=vram_required,
     )
 
     run_path = os.path.join(app_dir, stored_path) if stored_path and stored_path != "." else app_dir
@@ -507,22 +523,23 @@ async def deploy_template(template_id: str):
                     "port": port,
                     "allow_ips": None,
                     "auth_header": None,
+                    "vram_required": vram_required,
                 },
                 timeout=5,
             )
             resp.raise_for_status()
-        save_status(app_id, "building", log_path, app_type=app_type)
+        save_status(app_id, "building", log_path, app_type=app_type, vram_required=vram_required)
     except httpx.ConnectError:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type)
+        save_status(app_id, "error", log_path, app_type=app_type, vram_required=vram_required)
         raise HTTPException(status_code=502, detail="Unable to reach agent. Please ensure the agent is running and reachable.")
     except httpx.TimeoutException:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type)
+        save_status(app_id, "error", log_path, app_type=app_type, vram_required=vram_required)
         raise HTTPException(status_code=504, detail="Agent request timed out. Please make sure the agent is running.")
     except Exception as e:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type)
+        save_status(app_id, "error", log_path, app_type=app_type, vram_required=vram_required)
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"app_id": app_id, "url": url}
@@ -584,15 +601,16 @@ async def _stop_agent_and_update_status(app_id: str):
 async def get_status():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, status, url, gpu FROM apps")
+    c.execute("SELECT id, name, status, url, gpu FROM apps")
     rows = c.fetchall()
     conn.close()
     return [
         {
             "id": row[0],
-            "status": row[1],
-            "url": row[2] or f"/apps/{row[0]}/",
-            "gpu": row[3],
+            "name": row[1],
+            "status": row[2],
+            "url": row[3] or f"/apps/{row[0]}/",
+            "gpu": row[4],
         }
         for row in rows
     ]
@@ -629,14 +647,14 @@ async def restart_app(app_id: str):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute(
-        "SELECT type, log_path, port, allow_ips, auth_header FROM apps WHERE id=?",
+        "SELECT type, log_path, port, allow_ips, auth_header, vram_required FROM apps WHERE id=?",
         (app_id,),
     )
     row = c.fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="app not found")
-    app_type, log_path, stored_port, allow_ips_str, auth_header = row
+    app_type, log_path, stored_port, allow_ips_str, auth_header, vram_required = row
     conn.close()
 
     allowed = [ip.strip() for ip in allow_ips_str.split(',')] if allow_ips_str else None
@@ -676,6 +694,7 @@ async def restart_app(app_id: str):
                     "port": port,
                     "allow_ips": allowed,
                     "auth_header": auth_header,
+                    "vram_required": vram_required,
                 },
                 timeout=5,
             )
@@ -688,6 +707,7 @@ async def restart_app(app_id: str):
             app_type=app_type,
             allow_ips=allow_ips_str,
             auth_header=auth_header,
+            vram_required=vram_required,
         )
     except Exception as e:
         AVAILABLE_PORTS.add(port)
@@ -698,6 +718,7 @@ async def restart_app(app_id: str):
             app_type=app_type,
             allow_ips=allow_ips_str,
             auth_header=auth_header,
+            vram_required=vram_required,
         )
         raise HTTPException(status_code=500, detail=str(e))
 
