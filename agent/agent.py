@@ -20,7 +20,6 @@ app = FastAPI()
 
 PROCESSES = {}
 
-
 def get_available_gpu(required: int = 0) -> Optional[int]:
 
     """Return the first GPU index with enough free memory."""
@@ -47,6 +46,7 @@ def get_available_gpu(required: int = 0) -> Optional[int]:
         for idx, free in candidates:
             if free >= required:
                 return idx
+
     except Exception:
         return None
     return None
