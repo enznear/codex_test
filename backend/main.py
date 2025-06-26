@@ -45,6 +45,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS apps (
             id TEXT PRIMARY KEY,
             name TEXT,
+            description TEXT,
             type TEXT,
             status TEXT,
             log_path TEXT,
@@ -86,6 +87,8 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN gpu INTEGER")
     if "vram_required" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN vram_required INTEGER")
+    if "description" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN description TEXT")
     conn.commit()
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -167,6 +170,7 @@ def save_status(
     port: int = None,
     heartbeat: float = None,
     name: str = None,
+    description: str = None,
     url: str = None,
     app_type: str = None,
     allow_ips: str = None,
@@ -197,6 +201,9 @@ def save_status(
         if name is not None:
             fields.append("name=?")
             values.append(name)
+        if description is not None:
+            fields.append("description=?")
+            values.append(description)
         if url is not None:
             fields.append("url=?")
             values.append(url)
@@ -220,10 +227,11 @@ def save_status(
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpu, vram_required) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO apps(id, name, description, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpu, vram_required) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 app_id,
                 name or app_id,
+                description,
                 app_type or "",
                 status or "",
                 log_path,
@@ -244,6 +252,7 @@ def save_status(
 async def upload_app(
     name: str = Form(...),
     file: UploadFile = File(...),
+    description: str = Form(""),
     allow_ips: str = Form(None),
     auth_header: str = Form(None),
     vram_required: int = Form(0),
@@ -315,6 +324,7 @@ async def upload_app(
         log_path,
         port=port,
         name=name.strip(),
+        description=description.strip() if description else None,
         url=url,
         app_type=app_type,
         allow_ips=allowed_str,
@@ -348,6 +358,7 @@ async def upload_app(
             app_id,
             "building",
             log_path,
+            description=description.strip() if description else None,
             app_type=app_type,
             allow_ips=allowed_str,
             auth_header=auth_header,
@@ -528,18 +539,46 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
                 timeout=5,
             )
             resp.raise_for_status()
-        save_status(app_id, "building", log_path, app_type=app_type, vram_required=vram_required)
+        save_status(
+            app_id,
+            "building",
+            log_path,
+            app_type=app_type,
+            vram_required=vram_required,
+            description=description.strip() if description else None,
+        )
     except httpx.ConnectError:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type, vram_required=vram_required)
+        save_status(
+            app_id,
+            "error",
+            log_path,
+            app_type=app_type,
+            vram_required=vram_required,
+            description=description.strip() if description else None,
+        )
         raise HTTPException(status_code=502, detail="Unable to reach agent. Please ensure the agent is running and reachable.")
     except httpx.TimeoutException:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type, vram_required=vram_required)
+        save_status(
+            app_id,
+            "error",
+            log_path,
+            app_type=app_type,
+            vram_required=vram_required,
+            description=description.strip() if description else None,
+        )
         raise HTTPException(status_code=504, detail="Agent request timed out. Please make sure the agent is running.")
     except Exception as e:
         AVAILABLE_PORTS.add(port)
-        save_status(app_id, "error", log_path, app_type=app_type, vram_required=vram_required)
+        save_status(
+            app_id,
+            "error",
+            log_path,
+            app_type=app_type,
+            vram_required=vram_required,
+            description=description.strip() if description else None,
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"app_id": app_id, "url": url}
@@ -601,16 +640,17 @@ async def _stop_agent_and_update_status(app_id: str):
 async def get_status():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, name, status, url, gpu FROM apps")
+    c.execute("SELECT id, name, description, status, url, gpu FROM apps")
     rows = c.fetchall()
     conn.close()
     return [
         {
             "id": row[0],
             "name": row[1],
-            "status": row[2],
-            "url": row[3] or f"/apps/{row[0]}/",
-            "gpu": row[4],
+            "status": row[3],
+            "url": row[4] or f"/apps/{row[0]}/",
+            "gpu": row[5],
+            "description": row[2] or "",
         }
         for row in rows
     ]
@@ -774,6 +814,30 @@ async def delete_app(app_id: str):
         os.remove(log_file)
 
     return {"detail": "deleted"}
+
+
+class EditApp(BaseModel):
+    app_id: str
+    name: str
+    description: str = ""
+
+
+@app.post("/edit_app")
+async def edit_app(info: EditApp):
+    """Update app name and description."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE id=?", (info.app_id,))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="app not found")
+    c.execute("SELECT id FROM apps WHERE name=? AND id!=?", (info.name.strip(), info.app_id))
+    if c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="app name already exists")
+    conn.close()
+    save_status(info.app_id, name=info.name.strip(), description=info.description.strip())
+    return {"detail": "updated"}
 
 async def cleanup_task():
     """Periodically check for apps without heartbeat and mark them as error."""

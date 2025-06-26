@@ -29,6 +29,9 @@
       const [uploadMsg, setUploadMsg] = useState('');
       const [uploadProgress, setUploadProgress] = useState(0);
       const [templates, setTemplates] = useState([]);
+      const [editId, setEditId] = useState(null);
+      const [editName, setEditName] = useState('');
+      const [editDesc, setEditDesc] = useState('');
 
       useEffect(() => {
         fetch('/status')
@@ -81,6 +84,7 @@
         }
         const formData = new FormData();
         formData.append('name', name);
+        formData.append('description', description);
         formData.append('file', files[0]);
         formData.append('vram_required', vramRequired);
         const xhr = new XMLHttpRequest();
@@ -165,6 +169,29 @@
           .catch(() => {});
       };
 
+      const startEdit = (app) => {
+        setEditId(app.id);
+        setEditName(app.name || '');
+        setEditDesc(app.description || '');
+      };
+
+      const cancelEdit = () => {
+        setEditId(null);
+        setEditName('');
+        setEditDesc('');
+      };
+
+      const saveEdit = () => {
+        fetch('/edit_app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ app_id: editId, name: editName, description: editDesc })
+        }).then(() => {
+          refreshStatus();
+          cancelEdit();
+        }).catch(() => {});
+      };
+
       return (
         <div>
           <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
@@ -222,6 +249,9 @@
                     <h2 className="font-semibold">{app.name || app.id}</h2>
                     <p className="text-xs text-gray-500">ID: {app.id}</p>
                     <p className="text-sm text-gray-600">Status: {app.status}</p>
+                    {app.description && (
+                      <p className="text-sm text-gray-600">{app.description}</p>
+                    )}
                     {app.gpu !== null && app.gpu !== undefined && (
                       <p className="text-sm text-gray-600">GPU: {app.gpu}</p>
                     )}
@@ -233,9 +263,20 @@
                     <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
                     <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
                     <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
+                    <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
                     <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
                   </div>
                 </div>
+                {editId === app.id && (
+                  <div className="mt-2 space-y-2">
+                    <input type="text" className="border p-1 w-full" value={editName} onChange={e => setEditName(e.target.value)} />
+                    <input type="text" className="border p-1 w-full" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                    <div className="space-x-2">
+                      <button onClick={saveEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
+                      <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
+                    </div>
+                  </div>
+                )}
                 {showLogs[app.id] && (
                   <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}}>{logs[app.id] || 'Loading...'}</pre>
                 )}
