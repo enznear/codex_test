@@ -1,0 +1,387 @@
+import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import './index.css';
+
+// Nginx serves apps on port 8080
+const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
+
+    function App() {
+      const [name, setName] = useState('');
+      const [description, setDescription] = useState('');
+      const [runType, setRunType] = useState('gradio');
+      const [vramRequired, setVramRequired] = useState('0');
+      const [files, setFiles] = useState([]);
+      const [apps, setApps] = useState([]);
+      const [logs, setLogs] = useState({});
+      const [showLogs, setShowLogs] = useState({});
+      const [uploadMsg, setUploadMsg] = useState('');
+      const [uploadProgress, setUploadProgress] = useState(0);
+      const [templates, setTemplates] = useState([]);
+      const [editId, setEditId] = useState(null);
+      const [editName, setEditName] = useState('');
+      const [editDesc, setEditDesc] = useState('');
+      const [tEditId, setTEditId] = useState(null);
+      const [tEditName, setTEditName] = useState('');
+      const [tEditDesc, setTEditDesc] = useState('');
+      const [tEditVram, setTEditVram] = useState('0');
+
+      useEffect(() => {
+        fetch('/status')
+          .then(res => res.json())
+          .then(data => {
+            setApps(data);
+          })
+          .catch(() => {});
+        fetch('/templates')
+          .then(res => res.json())
+          .then(data => setTemplates(data))
+          .catch(() => {});
+      }, []);
+
+      const refreshStatus = () => {
+        fetch('/status')
+          .then(res => res.json())
+          .then(data => {
+            setApps(data);
+          });
+      };
+
+      const pollStatus = (appId) => {
+        const interval = setInterval(() => {
+          fetch('/status')
+            .then(res => res.json())
+            .then(data => {
+              setApps(data);
+              const app = data.find(a => a.id === appId);
+              if (!app || app.status !== 'stopping') {
+                clearInterval(interval);
+              }
+            })
+            .catch(() => {});
+        }, 2000);
+      };
+
+      useEffect(() => {
+        const interval = setInterval(() => {
+          refreshStatus();
+        }, 2000);
+        return () => clearInterval(interval);
+      }, []);
+
+      const handleUpload = (e) => {
+        e.preventDefault();
+        if (files.length === 0) return;
+        if (files.length > 1) {
+          alert('Multiple files selected. Only the first file will be uploaded. Bundle files into a zip to upload them all.');
+        }
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('file', files[0]);
+        formData.append('vram_required', vramRequired);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload');
+        setUploadMsg('Upload started');
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          let data = {};
+          try { data = JSON.parse(xhr.responseText); } catch (e) {}
+          setUploadProgress(0);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setUploadMsg('Upload finished: ' + (data.app_id || ''));
+            setName('');
+            setDescription('');
+            setRunType('gradio');
+            setVramRequired('0');
+            setFiles([]);
+            refreshStatus();
+          } else {
+            setUploadMsg('Error: ' + (data.detail || 'upload failed'));
+          }
+        };
+        xhr.onerror = () => {
+          setUploadMsg('Error uploading app.');
+          setUploadProgress(0);
+        };
+        xhr.send(formData);
+      };
+
+      const toggleLogs = (appId) => {
+        if (showLogs[appId]) {
+          setShowLogs(prev => ({ ...prev, [appId]: false }));
+          return;
+        }
+        fetch(`/logs/${appId}`)
+          .then(res => res.text())
+          .then(text => {
+            setLogs(prev => ({ ...prev, [appId]: text }));
+            setShowLogs(prev => ({ ...prev, [appId]: true }));
+          })
+          .catch(() => {
+            setLogs(prev => ({ ...prev, [appId]: 'Failed to load logs.' }));
+            setShowLogs(prev => ({ ...prev, [appId]: true }));
+        });
+      };
+
+      const stopApp = (id) => {
+        fetch(`/stop/${id}`, { method: 'POST' })
+          .then(() => {
+            refreshStatus();
+            pollStatus(id);
+          })
+          .catch(() => {});
+      };
+
+      const restartApp = (id) => {
+        fetch(`/restart/${id}`, { method: 'POST' })
+          .then(() => {
+            refreshStatus();
+          })
+          .catch(() => {});
+      };
+
+      const deleteApp = (id) => {
+        fetch(`/apps/${id}`, { method: 'DELETE' })
+          .then(() => {
+            refreshStatus();
+            setLogs(prev => { const n = { ...prev }; delete n[id]; return n; });
+          })
+          .catch(() => {});
+      };
+
+      const deployTemplate = (id) => {
+        fetch(`/deploy_template/${id}`, { method: 'POST' })
+          .then(() => {
+            refreshStatus();
+          })
+          .catch(() => {});
+      };
+
+      const saveTemplate = (id) => {
+        fetch(`/save_template/${id}`, { method: 'POST' })
+          .then(() => {
+            fetch('/templates')
+              .then(res => res.json())
+              .then(data => setTemplates(data));
+          })
+          .catch(() => {});
+      };
+
+      const deleteTemplate = (id) => {
+        fetch(`/templates/${id}`, { method: 'DELETE' })
+          .then(() => {
+            fetch('/templates')
+              .then(res => res.json())
+              .then(data => setTemplates(data));
+          })
+          .catch(() => {});
+      };
+
+      const startTemplateEdit = (t) => {
+        setTEditId(t.id);
+        setTEditName(t.name || '');
+        setTEditDesc(t.description || '');
+        setTEditVram(String(t.vram_required || 0));
+      };
+
+      const cancelTemplateEdit = () => {
+        setTEditId(null);
+        setTEditName('');
+        setTEditDesc('');
+        setTEditVram('0');
+      };
+
+      const saveTemplateEdit = () => {
+        fetch('/edit_template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            template_id: tEditId,
+            name: tEditName,
+            description: tEditDesc,
+            vram_required: parseInt(tEditVram, 10) || 0
+          })
+        }).then(() => {
+          fetch('/templates')
+            .then(res => res.json())
+            .then(data => setTemplates(data));
+          cancelTemplateEdit();
+        }).catch(() => {});
+      };
+
+
+      const startEdit = (app) => {
+        setEditId(app.id);
+        setEditName(app.name || '');
+        setEditDesc(app.description || '');
+      };
+
+      const cancelEdit = () => {
+        setEditId(null);
+        setEditName('');
+        setEditDesc('');
+      };
+
+      const saveEdit = () => {
+        fetch('/edit_app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ app_id: editId, name: editName, description: editDesc })
+        }).then(() => {
+          refreshStatus();
+          cancelEdit();
+        }).catch(() => {});
+      };
+
+      const UploadPage = () => (
+        <div>
+          <form onSubmit={handleUpload} className="bg-white p-4 rounded shadow mb-2 grid gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="name">App Name</label>
+              <input id="name" type="text" className="mt-1 p-2 border rounded w-full" placeholder="My Awesome App" value={name} onChange={e => setName(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="desc">Description</label>
+              <input id="desc" type="text" className="mt-1 p-2 border rounded w-full" placeholder="Short description" value={description} onChange={e => setDescription(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="type">Run Type</label>
+              <select id="type" className="mt-1 p-2 border rounded w-full" value={runType} onChange={e => setRunType(e.target.value)}>
+                <option value="gradio">Gradio</option>
+                <option value="docker">Docker</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="vram">Expected VRAM (MB)</label>
+              <input id="vram" type="number" className="mt-1 p-2 border rounded w-full" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="file">Upload File</label>
+              <input id="file" type="file" className="mt-1 p-2 border rounded w-full" onChange={e => setFiles(e.target.files)} multiple />
+            </div>
+            <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Upload</button>
+          </form>
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="w-full bg-gray-200 h-2 mt-2 rounded">
+              <div className="bg-blue-600 h-2 rounded" style={{width: `${uploadProgress}%`}}></div>
+            </div>
+          )}
+          {uploadMsg && <p className="text-sm mt-2">{uploadMsg}</p>}
+
+          <div className="bg-white p-4 rounded shadow mb-4">
+            <h2 className="text-xl font-bold mb-2">Templates</h2>
+            {templates.map(t => (
+              <div key={t.id} className="flex flex-col mb-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">{t.name}</p>
+                    <p className="text-sm text-gray-600">{t.description}</p>
+                    <p className="text-sm text-gray-600">Type: {t.type}</p>
+                    <p className="text-sm text-gray-600">VRAM: {t.vram_required}</p>
+                  </div>
+                  <div className="space-x-2">
+                    <button onClick={() => deployTemplate(t.id)} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Deploy</button>
+                    <button onClick={() => startTemplateEdit(t)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
+                    <button onClick={() => deleteTemplate(t.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
+                  </div>
+                </div>
+                {tEditId === t.id && (
+                  <div className="mt-2 space-y-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700" htmlFor="tedit-name">Template Name</label>
+                      <input id="tedit-name" type="text" className="border p-1 w-full" placeholder="Template Name" value={tEditName} onChange={e => setTEditName(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700" htmlFor="tedit-desc">Description</label>
+                      <input id="tedit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={tEditDesc} onChange={e => setTEditDesc(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700" htmlFor="tedit-vram">Expected VRAM (MB)</label>
+                      <input id="tedit-vram" type="number" className="border p-1 w-full" placeholder="0" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
+                    </div>
+                    <div className="space-x-2">
+                      <button onClick={saveTemplateEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
+                      <button onClick={cancelTemplateEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      const AppsPage = () => (
+        <div className="grid gap-4">
+          {apps.map(app => (
+            <div key={app.id} className="bg-white p-4 rounded shadow">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="font-semibold">{app.name || app.id}</h2>
+                  <p className="text-xs text-gray-500">ID: {app.id}</p>
+                  <p className="text-sm text-gray-600">Status: {app.status}</p>
+                  {app.description && (
+                    <p className="text-sm text-gray-600">{app.description}</p>
+                  )}
+                  {app.gpu !== null && app.gpu !== undefined && (
+                    <p className="text-sm text-gray-600">GPU: {app.gpu}</p>
+                  )}
+                  {app.url && (
+                    <a href={`${nginxBase}${app.url}`} target="_blank" rel="noopener" className="text-blue-600 text-sm underline">Open</a>
+                  )}
+                </div>
+                <div className="space-x-2">
+                  <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
+                  <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
+                  <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
+                  <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
+                  <button onClick={() => saveTemplate(app.id)} className="bg-green-200 px-3 py-1 rounded text-sm hover:bg-green-300">Save Template</button>
+                  <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
+                </div>
+              </div>
+              {editId === app.id && (
+                <div className="mt-2 space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700" htmlFor="edit-name">App Name</label>
+                    <input id="edit-name" type="text" className="border p-1 w-full" placeholder="App Name" value={editName} onChange={e => setEditName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700" htmlFor="edit-desc">Description</label>
+                    <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                  </div>
+                  <div className="space-x-2">
+                    <button onClick={saveEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
+                    <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
+                  </div>
+                </div>
+              )}
+              {showLogs[app.id] && (
+                <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}}>{logs[app.id] || 'Loading...'}</pre>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+
+      return (
+        <BrowserRouter>
+          <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
+          <nav className="mb-4 space-x-4">
+            <Link to="/">Upload</Link>
+            <Link to="/apps">Running Apps</Link>
+          </nav>
+          <Routes>
+            <Route path="/" element={<UploadPage />} />
+            <Route path="/apps" element={<AppsPage />} />
+          </Routes>
+        </BrowserRouter>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
