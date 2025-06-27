@@ -179,6 +179,17 @@
           .catch(() => {});
       };
 
+      const deleteTemplate = (id) => {
+        fetch(`/templates/${id}`, { method: 'DELETE' })
+          .then(() => {
+            fetch('/templates')
+              .then(res => res.json())
+              .then(data => setTemplates(data));
+          })
+          .catch(() => {});
+      };
+
+
       const startEdit = (app) => {
         setEditId(app.id);
         setEditName(app.name || '');
@@ -245,8 +256,13 @@
                 <div>
                   <p className="font-semibold">{t.name}</p>
                   <p className="text-sm text-gray-600">{t.description}</p>
+                  <p className="text-sm text-gray-600">Type: {t.type}</p>
+                  <p className="text-sm text-gray-600">VRAM: {t.vram_required}</p>
                 </div>
-                <button onClick={() => deployTemplate(t.id)} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Deploy</button>
+                <div className="space-x-2">
+                  <button onClick={() => deployTemplate(t.id)} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Deploy</button>
+                  <button onClick={() => deleteTemplate(t.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
+                </div>
               </div>
             ))}
           </div>

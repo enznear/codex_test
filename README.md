@@ -152,12 +152,16 @@ You can store reusable app templates and deploy them with a single click.
   - `name`: template name.
   - `file`: archive or single file containing the template.
   - `description` (optional): short text shown in the UI.
-- `GET /templates` – list available templates.
+  - `vram_required` (optional): expected VRAM for apps deployed from this template.
+- `GET /templates` – list available templates with `id`, `name`, `description`, `type` and `vram_required`.
 - `POST /deploy_template/{template_id}` – copy the template to the uploads directory and start it just like an uploaded app. The response includes the new `app_id` and URL.
 - `POST /save_template/{app_id}` – save an uploaded app as a new template using its current name and description.
+- `DELETE /templates/{template_id}` – remove a saved template and its files.
 
 Any folder placed directly under `./templates` will be automatically registered as a template when the backend starts or when the templates list is fetched.
 
 
 On the frontend the templates are loaded on page load and displayed with a **Deploy** button. Clicking it triggers the deployment endpoint and the running apps list is refreshed automatically.
 Each uploaded app also shows a **Save Template** button to store it for future reuse.
+Templates display their name, description, type and VRAM, along with a **Delete** button to remove them.
+
