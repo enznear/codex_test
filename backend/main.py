@@ -34,6 +34,11 @@ async def frontend_index():
     """Return the frontend single-page app."""
     return FileResponse("frontend/index.html")
 
+@app.get("/apps", include_in_schema=False)
+async def frontend_apps():
+    """Return the frontend single-page app for router paths."""
+    return FileResponse("frontend/index.html")
+
 # Allowed pattern for uploaded filenames
 ALLOWED_FILENAME = re.compile(r"^[A-Za-z0-9._-]+$")
 
