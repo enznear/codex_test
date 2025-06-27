@@ -4,13 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App Portal</title>
+  <link rel="stylesheet" href="hf-theme.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-router-dom@5.3.4/umd/react-router-dom.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="min-h-screen">
   <div id="root" class="container mx-auto p-4"></div>
 
   <script type="text/babel">
@@ -254,16 +255,18 @@
 
       return (
         <div>
-            <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
-            <nav className="mb-4 space-x-4">
-              <Link to="/" className={`px-2 py-1 rounded ${location.pathname === '/' ? 'bg-gray-300' : ''}`}>Create</Link>
-              <Link to="/apps" className={`px-2 py-1 rounded ${location.pathname === '/apps' ? 'bg-gray-300' : ''}`}>Running Apps</Link>
-            </nav>
+            <header className="topbar flex items-center justify-between mb-6 p-4 rounded">
+              <h1 className="text-xl font-semibold">AI App Portal</h1>
+              <nav className="space-x-4">
+                <Link to="/" className={`px-3 py-1 rounded ${location.pathname === '/' ? 'bg-gray-200 dark:bg-gray-700' : ''}`}>Create</Link>
+                <Link to="/apps" className={`px-3 py-1 rounded ${location.pathname === '/apps' ? 'bg-gray-200 dark:bg-gray-700' : ''}`}>Running Apps</Link>
+              </nav>
+            </header>
             <Switch>
               <Route exact path="/">
                 <>
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <form onSubmit={handleUpload} className="bg-white p-4 rounded shadow mb-2 grid gap-4">
+                      <form onSubmit={handleUpload} className="card p-4 rounded mb-2 grid gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700" htmlFor="name">App Name</label>
                         <input id="name" type="text" className="mt-1 p-2 border rounded w-full" placeholder="My Awesome App" value={name} onChange={e => setName(e.target.value)} />
@@ -287,9 +290,9 @@
                       <label className="block text-sm font-medium text-gray-700" htmlFor="file">Upload File</label>
                       <input id="file" type="file" className="mt-1 p-2 border rounded w-full" onChange={e => setFiles(e.target.files)} multiple />
                     </div>
-                    <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Upload</button>
+                    <button type="submit" className="hf-btn py-2 px-4 rounded hover:opacity-90">Upload</button>
                   </form>
-                  <div className="bg-white p-4 rounded shadow mb-4 lg:mb-0">
+                  <div className="card p-4 rounded mb-4 lg:mb-0">
                     <h2 className="text-xl font-bold mb-2">Templates</h2>
                     {templates.map(t => (
                       <div key={t.id} className="flex flex-col mb-2">
@@ -301,7 +304,7 @@
                             <p className="text-sm text-gray-600">VRAM: {t.vram_required}</p>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button onClick={() => deployTemplate(t.id)} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Deploy</button>
+                            <button onClick={() => deployTemplate(t.id)} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Deploy</button>
                             <button onClick={() => startTemplateEdit(t)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
                             <button onClick={() => deleteTemplate(t.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
                           </div>
@@ -321,7 +324,7 @@
                               <input id="tedit-vram" type="number" className="border p-1 w-full" placeholder="0" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              <button onClick={saveTemplateEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
+                              <button onClick={saveTemplateEdit} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
                               <button onClick={cancelTemplateEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
                             </div>
                           </div>
@@ -341,7 +344,7 @@
               <Route path="/apps">
                 <div className="grid gap-4 lg:grid-cols-2">
                   {apps.map(app => (
-                    <div key={app.id} className="bg-white p-4 rounded shadow">
+                    <div key={app.id} className="card p-4 rounded">
                       <div className="flex justify-between items-center">
                         <div>
                           <h2 className="font-semibold">{app.name || app.id}</h2>
@@ -362,7 +365,7 @@
                           <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
                           <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
                           <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
-                          <button onClick={() => saveTemplate(app.id)} className="bg-green-200 px-3 py-1 rounded text-sm hover:bg-green-300">Save Template</button>
+                          <button onClick={() => saveTemplate(app.id)} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Save Template</button>
                           <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
                         </div>
                       </div>
@@ -377,7 +380,7 @@
                             <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button onClick={saveEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
+                            <button onClick={saveEdit} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
                             <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
                           </div>
                         </div>
