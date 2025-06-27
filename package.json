@@ -1,0 +1,32 @@
+{
+  "name": "codex_test",
+  "version": "1.0.0",
+  "description": "This repository contains a sample FastAPI backend and agent for deploying user uploaded Gradio or Docker apps on a GPU server.",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.24",
+    "autoprefixer": "^10.4.14",
+    "vite": "^4.5.0",
+    "@vitejs/plugin-react": "^4.0.3",
+    "@babel/core": "^7.22.20",
+    "@babel/preset-react": "^7.22.5"
+  }
+}
