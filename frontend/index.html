@@ -300,7 +300,7 @@
                             <p className="text-sm text-gray-600">Type: {t.type}</p>
                             <p className="text-sm text-gray-600">VRAM: {t.vram_required}</p>
                           </div>
-                          <div className="space-x-2">
+                          <div className="flex flex-wrap gap-2">
                             <button onClick={() => deployTemplate(t.id)} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Deploy</button>
                             <button onClick={() => startTemplateEdit(t)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
                             <button onClick={() => deleteTemplate(t.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
@@ -320,7 +320,7 @@
                               <label className="block text-sm font-medium text-gray-700" htmlFor="tedit-vram">Expected VRAM (MB)</label>
                               <input id="tedit-vram" type="number" className="border p-1 w-full" placeholder="0" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
                             </div>
-                            <div className="space-x-2">
+                            <div className="flex flex-wrap gap-2">
                               <button onClick={saveTemplateEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
                               <button onClick={cancelTemplateEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
                             </div>
@@ -357,7 +357,7 @@
                             <a href={`${nginxBase}${app.url}`} target="_blank" rel="noopener" className="text-blue-600 text-sm underline">Open</a>
                           )}
                         </div>
-                        <div className="space-x-2">
+                        <div className="flex flex-wrap gap-2">
                           <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
                           <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
                           <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
@@ -376,7 +376,7 @@
                             <label className="block text-sm font-medium text-gray-700" htmlFor="edit-desc">Description</label>
                             <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                           </div>
-                          <div className="space-x-2">
+                          <div className="flex flex-wrap gap-2">
                             <button onClick={saveEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
                             <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
                           </div>
