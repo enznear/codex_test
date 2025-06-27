@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-router-dom@6/umd/react-router-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -14,6 +15,7 @@
 
   <script type="text/babel">
     const { useState, useEffect } = React;
+    const { BrowserRouter, Routes, Route, Link } = ReactRouterDOM;
     // Nginx serves apps on port 8080
     const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
 
@@ -249,9 +251,8 @@
         }).catch(() => {});
       };
 
-      return (
+      const UploadPage = () => (
         <div>
-          <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
           <form onSubmit={handleUpload} className="bg-white p-4 rounded shadow mb-2 grid gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700" htmlFor="name">App Name</label>
@@ -325,57 +326,73 @@
               </div>
             ))}
           </div>
+        </div>
+      );
 
-          <div className="grid gap-4">
-            {apps.map(app => (
-              <div key={app.id} className="bg-white p-4 rounded shadow">
-                <div className="flex justify-between items-center">
+      const AppsPage = () => (
+        <div className="grid gap-4">
+          {apps.map(app => (
+            <div key={app.id} className="bg-white p-4 rounded shadow">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="font-semibold">{app.name || app.id}</h2>
+                  <p className="text-xs text-gray-500">ID: {app.id}</p>
+                  <p className="text-sm text-gray-600">Status: {app.status}</p>
+                  {app.description && (
+                    <p className="text-sm text-gray-600">{app.description}</p>
+                  )}
+                  {app.gpu !== null && app.gpu !== undefined && (
+                    <p className="text-sm text-gray-600">GPU: {app.gpu}</p>
+                  )}
+                  {app.url && (
+                    <a href={`${nginxBase}${app.url}`} target="_blank" rel="noopener" className="text-blue-600 text-sm underline">Open</a>
+                  )}
+                </div>
+                <div className="space-x-2">
+                  <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
+                  <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
+                  <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
+                  <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
+                  <button onClick={() => saveTemplate(app.id)} className="bg-green-200 px-3 py-1 rounded text-sm hover:bg-green-300">Save Template</button>
+                  <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
+                </div>
+              </div>
+              {editId === app.id && (
+                <div className="mt-2 space-y-2">
                   <div>
-                    <h2 className="font-semibold">{app.name || app.id}</h2>
-                    <p className="text-xs text-gray-500">ID: {app.id}</p>
-                    <p className="text-sm text-gray-600">Status: {app.status}</p>
-                    {app.description && (
-                      <p className="text-sm text-gray-600">{app.description}</p>
-                    )}
-                    {app.gpu !== null && app.gpu !== undefined && (
-                      <p className="text-sm text-gray-600">GPU: {app.gpu}</p>
-                    )}
-                    {app.url && (
-                      <a href={`${nginxBase}${app.url}`} target="_blank" rel="noopener" className="text-blue-600 text-sm underline">Open</a>
-                    )}
+                    <label className="block text-sm font-medium text-gray-700" htmlFor="edit-name">App Name</label>
+                    <input id="edit-name" type="text" className="border p-1 w-full" placeholder="App Name" value={editName} onChange={e => setEditName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700" htmlFor="edit-desc">Description</label>
+                    <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                   </div>
                   <div className="space-x-2">
-                    <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
-                    <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
-                    <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
-                    <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
-                    <button onClick={() => saveTemplate(app.id)} className="bg-green-200 px-3 py-1 rounded text-sm hover:bg-green-300">Save Template</button>
-                    <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
+                    <button onClick={saveEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
+                    <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
                   </div>
                 </div>
-                {editId === app.id && (
-                  <div className="mt-2 space-y-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700" htmlFor="edit-name">App Name</label>
-                      <input id="edit-name" type="text" className="border p-1 w-full" placeholder="App Name" value={editName} onChange={e => setEditName(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700" htmlFor="edit-desc">Description</label>
-                      <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
-                    </div>
-                    <div className="space-x-2">
-                      <button onClick={saveEdit} className="bg-blue-600 text-white px-2 py-1 rounded">Save</button>
-                      <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
-                    </div>
-                  </div>
-                )}
-                {showLogs[app.id] && (
-                  <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}}>{logs[app.id] || 'Loading...'}</pre>
-                )}
-              </div>
-            ))}
-          </div>
+              )}
+              {showLogs[app.id] && (
+                <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}}>{logs[app.id] || 'Loading...'}</pre>
+              )}
+            </div>
+          ))}
         </div>
+      );
+
+      return (
+        <BrowserRouter>
+          <h1 className="text-2xl font-bold mb-4">AI App Portal</h1>
+          <nav className="mb-4 space-x-4">
+            <Link to="/">Upload</Link>
+            <Link to="/apps">Running Apps</Link>
+          </nav>
+          <Routes>
+            <Route path="/" element={<UploadPage />} />
+            <Route path="/apps" element={<AppsPage />} />
+          </Routes>
+        </BrowserRouter>
       );
     }
 
