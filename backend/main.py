@@ -765,6 +765,54 @@ async def restart_app(app_id: str):
     return {"detail": "restarting", "url": f"/apps/{app_id}/"}
 
 
+@app.post("/save_template/{app_id}")
+async def save_template_from_app(app_id: str):
+    """Save an uploaded app as a reusable template."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT name, description, type FROM apps WHERE id=?",
+        (app_id,),
+    )
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="app not found")
+    name, description, app_type = row
+
+    template_id = str(uuid.uuid4())
+    src_dir = os.path.join(UPLOAD_DIR, app_id)
+    dst_dir = os.path.join(TEMPLATE_DIR, template_id)
+    shutil.copytree(src_dir, dst_dir)
+
+    if app_type == "docker_tar":
+        files = [f for f in os.listdir(dst_dir) if f.endswith(".tar")]
+        if not files:
+            shutil.rmtree(dst_dir, ignore_errors=True)
+            raise HTTPException(status_code=500, detail="tar file missing")
+        stored_path = files[0]
+    else:
+        stored_path = "."
+        for root, _, files in os.walk(dst_dir):
+            for fname in files:
+                if fname.lower() == "dockerfile":
+                    app_type = "docker"
+                    break
+            if app_type == "docker":
+                break
+
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO templates(id, name, type, path, description) VALUES(?,?,?,?,?)",
+        (template_id, name, app_type, stored_path, description or ""),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"template_id": template_id}
+
+
 @app.delete("/apps/{app_id}")
 async def delete_app(app_id: str):
     """Delete an app and all its data."""
