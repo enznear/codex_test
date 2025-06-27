@@ -521,14 +521,14 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute(
-        "SELECT name, type, path FROM templates WHERE id=?",
+        "SELECT name, type, path, description FROM templates WHERE id=?",
         (template_id,),
     )
     row = c.fetchone()
     conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="template not found")
-    name, app_type, stored_path = row
+    name, app_type, stored_path, description = row
 
     app_id = str(uuid.uuid4())
     app_dir = os.path.join(UPLOAD_DIR, app_id)
@@ -556,6 +556,7 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
         url=url,
         app_type=app_type,
         vram_required=vram_required,
+        description=description.strip() if description else None,
     )
 
     run_path = os.path.join(app_dir, stored_path) if stored_path and stored_path != "." else app_dir
@@ -910,6 +911,12 @@ class EditApp(BaseModel):
     name: str
     description: str = ""
 
+class EditTemplate(BaseModel):
+    template_id: str
+    name: str
+    description: str = ""
+    vram_required: int = 0
+
 
 @app.post("/edit_app")
 async def edit_app(info: EditApp):
@@ -926,6 +933,36 @@ async def edit_app(info: EditApp):
         raise HTTPException(status_code=400, detail="app name already exists")
     conn.close()
     save_status(info.app_id, name=info.name.strip(), description=info.description.strip())
+    return {"detail": "updated"}
+
+
+@app.post("/edit_template")
+async def edit_template(info: EditTemplate):
+    """Update template metadata."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM templates WHERE id=?", (info.template_id,))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="template not found")
+    c.execute(
+        "SELECT id FROM templates WHERE name=? AND id!=?",
+        (info.name.strip(), info.template_id),
+    )
+    if c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="template name already exists")
+    c.execute(
+        "UPDATE templates SET name=?, description=?, vram_required=? WHERE id=?",
+        (
+            info.name.strip(),
+            info.description.strip(),
+            info.vram_required,
+            info.template_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
     return {"detail": "updated"}
 
 async def cleanup_task():

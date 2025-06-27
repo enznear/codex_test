@@ -441,7 +441,7 @@ async def stop_app(req: StopRequest):
     try:
         proc.terminate()
         try:
-            await asyncio.wait_for(proc.wait(), 10)
+            await asyncio.wait_for(proc.wait(), 30)
         except (asyncio.TimeoutError, subprocess.TimeoutExpired):
             proc.kill()
         except Exception:
