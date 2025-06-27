@@ -66,7 +66,8 @@ def init_db():
             name TEXT,
             type TEXT,
             path TEXT,
-            description TEXT
+            description TEXT,
+            vram_required INTEGER
         )
         """
     )
@@ -89,6 +90,11 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN vram_required INTEGER")
     if "description" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN description TEXT")
+    # Add new columns to templates table if needed
+    c.execute("PRAGMA table_info(templates)")
+    t_cols = [row[1] for row in c.fetchall()]
+    if "vram_required" not in t_cols:
+        c.execute("ALTER TABLE templates ADD COLUMN vram_required INTEGER")
     conn.commit()
     conn.close()
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -121,8 +127,8 @@ def ensure_templates():
             if app_type != "gradio":
                 break
         c.execute(
-            "INSERT INTO templates(id, name, type, path, description) VALUES(?,?,?,?,?)",
-            (entry, entry, app_type, stored_path, ""),
+            "INSERT INTO templates(id, name, type, path, description, vram_required) VALUES(?,?,?,?,?,?)",
+            (entry, entry, app_type, stored_path, "", 0),
         )
     conn.commit()
     conn.close()
@@ -414,7 +420,8 @@ async def upload_app(
 async def upload_template(
     name: str = Form(...),
     file: UploadFile = File(...),
-    description: str = Form("")
+    description: str = Form(""),
+    vram_required: int = Form(0),
 ):
     """Upload a template archive or file."""
     template_id = str(uuid.uuid4())
@@ -454,13 +461,38 @@ async def upload_template(
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO templates(id, name, type, path, description) VALUES(?,?,?,?,?)",
-        (template_id, name.strip(), app_type, stored_path, description.strip()),
+        "INSERT INTO templates(id, name, type, path, description, vram_required) VALUES(?,?,?,?,?,?)",
+        (
+            template_id,
+            name.strip(),
+            app_type,
+            stored_path,
+            description.strip(),
+            vram_required,
+        ),
     )
     conn.commit()
     conn.close()
 
     return {"template_id": template_id}
+
+
+@app.delete("/templates/{template_id}")
+async def delete_template(template_id: str):
+    """Remove a saved template and its files."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM templates WHERE id=?", (template_id,))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="template not found")
+    c.execute("DELETE FROM templates WHERE id=?", (template_id,))
+    conn.commit()
+    conn.close()
+
+    shutil.rmtree(os.path.join(TEMPLATE_DIR, template_id), ignore_errors=True)
+
+    return {"detail": "deleted"}
 
 
 @app.get("/templates")
@@ -469,11 +501,17 @@ async def list_templates():
 
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, name, description FROM templates")
+    c.execute("SELECT id, name, description, type, vram_required FROM templates")
     rows = c.fetchall()
     conn.close()
     return [
-        {"id": row[0], "name": row[1], "description": row[2] or ""}
+        {
+            "id": row[0],
+            "name": row[1],
+            "description": row[2] or "",
+            "type": row[3],
+            "vram_required": row[4] or 0,
+        }
         for row in rows
     ]
 
@@ -763,6 +801,54 @@ async def restart_app(app_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"detail": "restarting", "url": f"/apps/{app_id}/"}
+
+
+@app.post("/save_template/{app_id}")
+async def save_template_from_app(app_id: str):
+    """Save an uploaded app as a reusable template."""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "SELECT name, description, type, vram_required FROM apps WHERE id=?",
+        (app_id,),
+    )
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="app not found")
+    name, description, app_type, vram_required = row
+
+    template_id = str(uuid.uuid4())
+    src_dir = os.path.join(UPLOAD_DIR, app_id)
+    dst_dir = os.path.join(TEMPLATE_DIR, template_id)
+    shutil.copytree(src_dir, dst_dir)
+
+    if app_type == "docker_tar":
+        files = [f for f in os.listdir(dst_dir) if f.endswith(".tar")]
+        if not files:
+            shutil.rmtree(dst_dir, ignore_errors=True)
+            raise HTTPException(status_code=500, detail="tar file missing")
+        stored_path = files[0]
+    else:
+        stored_path = "."
+        for root, _, files in os.walk(dst_dir):
+            for fname in files:
+                if fname.lower() == "dockerfile":
+                    app_type = "docker"
+                    break
+            if app_type == "docker":
+                break
+
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO templates(id, name, type, path, description, vram_required) VALUES(?,?,?,?,?,?)",
+        (template_id, name, app_type, stored_path, description or "", vram_required or 0),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"template_id": template_id}
 
 
 @app.delete("/apps/{app_id}")
