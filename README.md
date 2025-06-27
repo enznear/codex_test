@@ -164,3 +164,4 @@ Any folder placed directly under `./templates` will be automatically registered 
 On the frontend the templates are loaded on page load and displayed with a **Deploy** button. Clicking it triggers the deployment endpoint and the running apps list is refreshed automatically.
 Each uploaded app also shows a **Save Template** button to store it for future reuse.
 Templates display their name, description, type and VRAM, along with a **Delete** button to remove them.
+

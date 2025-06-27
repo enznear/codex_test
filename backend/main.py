@@ -810,6 +810,7 @@ async def save_template_from_app(app_id: str):
     c = conn.cursor()
     c.execute(
         "SELECT name, description, type, vram_required FROM apps WHERE id=?",
+
         (app_id,),
     )
     row = c.fetchone()
@@ -817,6 +818,7 @@ async def save_template_from_app(app_id: str):
     if not row:
         raise HTTPException(status_code=404, detail="app not found")
     name, description, app_type, vram_required = row
+
 
     template_id = str(uuid.uuid4())
     src_dir = os.path.join(UPLOAD_DIR, app_id)
@@ -844,6 +846,7 @@ async def save_template_from_app(app_id: str):
     c.execute(
         "INSERT INTO templates(id, name, type, path, description, vram_required) VALUES(?,?,?,?,?,?)",
         (template_id, name, app_type, stored_path, description or "", vram_required or 0),
+
     )
     conn.commit()
     conn.close()
