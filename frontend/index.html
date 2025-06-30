@@ -268,26 +268,26 @@
                   <div className="grid gap-4 lg:grid-cols-2">
                       <form onSubmit={handleUpload} className="card p-4 rounded mb-2 grid gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700" htmlFor="name">App Name</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="name">App Name</label>
                         <input id="name" type="text" className="mt-1 p-2 border rounded w-full" placeholder="My Awesome App" value={name} onChange={e => setName(e.target.value)} />
                       </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700" htmlFor="desc">Description</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="desc">Description</label>
                       <input id="desc" type="text" className="mt-1 p-2 border rounded w-full" placeholder="Short description" value={description} onChange={e => setDescription(e.target.value)} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700" htmlFor="type">Run Type</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="type">Run Type</label>
                       <select id="type" className="mt-1 p-2 border rounded w-full" value={runType} onChange={e => setRunType(e.target.value)}>
                         <option value="gradio">Gradio</option>
                         <option value="docker">Docker</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700" htmlFor="vram">Expected VRAM (MB)</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="vram">Expected VRAM (MB)</label>
                       <input id="vram" type="number" className="mt-1 p-2 border rounded w-full" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700" htmlFor="file">Upload File</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="file">Upload File</label>
                       <input id="file" type="file" className="mt-1 p-2 border rounded w-full" onChange={e => setFiles(e.target.files)} multiple />
                     </div>
                     <button type="submit" className="hf-btn py-2 px-4 rounded hover:opacity-90">Upload</button>
@@ -299,33 +299,33 @@
                         <div className="flex justify-between items-center">
                           <div>
                             <p className="font-semibold">{t.name}</p>
-                            <p className="text-sm text-gray-600">{t.description}</p>
-                            <p className="text-sm text-gray-600">Type: {t.type}</p>
-                            <p className="text-sm text-gray-600">VRAM: {t.vram_required}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{t.description}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Type: {t.type}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">VRAM: {t.vram_required}</p>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <button onClick={() => deployTemplate(t.id)} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Deploy</button>
-                            <button onClick={() => startTemplateEdit(t)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
-                            <button onClick={() => deleteTemplate(t.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
+                            <button onClick={() => startTemplateEdit(t)} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">Edit</button>
+                            <button onClick={() => deleteTemplate(t.id)} className="bg-red-200 px-3 py-1 rounded text-sm text-black hover:bg-red-300">Delete</button>
                           </div>
                         </div>
                         {tEditId === t.id && (
                           <div className="mt-2 space-y-2">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700" htmlFor="tedit-name">Template Name</label>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="tedit-name">Template Name</label>
                               <input id="tedit-name" type="text" className="border p-1 w-full" placeholder="Template Name" value={tEditName} onChange={e => setTEditName(e.target.value)} />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700" htmlFor="tedit-desc">Description</label>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="tedit-desc">Description</label>
                               <input id="tedit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={tEditDesc} onChange={e => setTEditDesc(e.target.value)} />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700" htmlFor="tedit-vram">Expected VRAM (MB)</label>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="tedit-vram">Expected VRAM (MB)</label>
                               <input id="tedit-vram" type="number" className="border p-1 w-full" placeholder="0" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <button onClick={saveTemplateEdit} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
-                              <button onClick={cancelTemplateEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
+                              <button onClick={cancelTemplateEdit} className="bg-gray-200 px-2 py-1 rounded text-black">Cancel</button>
                             </div>
                           </div>
                         )}
@@ -348,40 +348,40 @@
                       <div className="flex justify-between items-center">
                         <div>
                           <h2 className="font-semibold">{app.name || app.id}</h2>
-                          <p className="text-xs text-gray-500">ID: {app.id}</p>
-                          <p className="text-sm text-gray-600">Status: {app.status}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">ID: {app.id}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Status: {app.status}</p>
                           {app.description && (
-                            <p className="text-sm text-gray-600">{app.description}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{app.description}</p>
                           )}
                           {app.gpu !== null && app.gpu !== undefined && (
-                            <p className="text-sm text-gray-600">GPU: {app.gpu}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">GPU: {app.gpu}</p>
                           )}
                           {app.url && (
                             <a href={`${nginxBase}${app.url}`} target="_blank" rel="noopener" className="text-blue-600 text-sm underline">Open</a>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
-                          <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm hover:bg-yellow-300">Stop</button>
-                          <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm hover:bg-blue-300">Restart</button>
-                          <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm hover:bg-gray-300">Edit</button>
+                          <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
+                          <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm text-black hover:bg-yellow-300">Stop</button>
+                          <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm text-black hover:bg-blue-300">Restart</button>
+                          <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">Edit</button>
                           <button onClick={() => saveTemplate(app.id)} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Save Template</button>
-                          <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm hover:bg-red-300">Delete</button>
+                          <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm text-black hover:bg-red-300">Delete</button>
                         </div>
                       </div>
                       {editId === app.id && (
                         <div className="mt-2 space-y-2">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700" htmlFor="edit-name">App Name</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="edit-name">App Name</label>
                             <input id="edit-name" type="text" className="border p-1 w-full" placeholder="App Name" value={editName} onChange={e => setEditName(e.target.value)} />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700" htmlFor="edit-desc">Description</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="edit-desc">Description</label>
                             <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <button onClick={saveEdit} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
-                            <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded">Cancel</button>
+                            <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded text-black">Cancel</button>
                           </div>
                         </div>
                       )}
