@@ -346,7 +346,11 @@
               <Route path="/apps">
                 <div className="grid gap-4 lg:grid-cols-2">
                   {apps.map(app => (
-                    <div key={app.id} className="card p-4 rounded">
+                    <div
+                      key={app.id}
+                      className="card p-4 rounded cursor-pointer"
+                      onClick={() => app.url && window.open(`${nginxBase}${app.url}`, '_blank')}
+                    >
                       <div className="flex justify-between items-center">
                         <div>
                           <h2 className="font-semibold">{app.name || app.id}</h2>
@@ -358,37 +362,34 @@
                           {app.gpu !== null && app.gpu !== undefined && (
                             <p className="text-sm text-gray-600 dark:text-gray-400">GPU: {app.gpu}</p>
                           )}
-                          {app.url && (
-                            <a href={`${nginxBase}${app.url}`} target="_blank" rel="noopener" className="text-blue-600 text-sm underline">Open</a>
-                          )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <button onClick={() => toggleLogs(app.id)} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
-                          <button onClick={() => stopApp(app.id)} className="bg-yellow-200 px-3 py-1 rounded text-sm text-black hover:bg-yellow-300">Stop</button>
-                          <button onClick={() => restartApp(app.id)} className="bg-blue-200 px-3 py-1 rounded text-sm text-black hover:bg-blue-300">Restart</button>
-                          <button onClick={() => startEdit(app)} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">Edit</button>
-                          <button onClick={() => saveTemplate(app.id)} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Save Template</button>
-                          <button onClick={() => deleteApp(app.id)} className="bg-red-200 px-3 py-1 rounded text-sm text-black hover:bg-red-300">Delete</button>
+                          <button onClick={(e) => { e.stopPropagation(); toggleLogs(app.id); }} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
+                          <button onClick={(e) => { e.stopPropagation(); stopApp(app.id); }} className="bg-yellow-200 px-3 py-1 rounded text-sm text-black hover:bg-yellow-300">Stop</button>
+                          <button onClick={(e) => { e.stopPropagation(); restartApp(app.id); }} className="bg-blue-200 px-3 py-1 rounded text-sm text-black hover:bg-blue-300">Restart</button>
+                          <button onClick={(e) => { e.stopPropagation(); startEdit(app); }} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">Edit</button>
+                          <button onClick={(e) => { e.stopPropagation(); saveTemplate(app.id); }} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Save Template</button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteApp(app.id); }} className="bg-red-200 px-3 py-1 rounded text-sm text-black hover:bg-red-300">Delete</button>
                         </div>
                       </div>
                       {editId === app.id && (
                         <div className="mt-2 space-y-2">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="edit-name">App Name</label>
-                            <input id="edit-name" type="text" className="border p-1 w-full" placeholder="App Name" value={editName} onChange={e => setEditName(e.target.value)} />
+                            <input id="edit-name" type="text" className="border p-1 w-full" placeholder="App Name" value={editName} onClick={e => e.stopPropagation()} onChange={e => setEditName(e.target.value)} />
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="edit-desc">Description</label>
-                            <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                            <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onClick={e => e.stopPropagation()} onChange={e => setEditDesc(e.target.value)} />
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button onClick={saveEdit} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
-                            <button onClick={cancelEdit} className="bg-gray-200 px-2 py-1 rounded text-black">Cancel</button>
+                            <button onClick={(e) => { e.stopPropagation(); saveEdit(); }} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
+                            <button onClick={(e) => { e.stopPropagation(); cancelEdit(); }} className="bg-gray-200 px-2 py-1 rounded text-black">Cancel</button>
                           </div>
                         </div>
                       )}
                       {showLogs[app.id] && (
-                        <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}}>{logs[app.id] || 'Loading...'}</pre>
+                        <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}} onClick={e => e.stopPropagation()}>{logs[app.id] || 'Loading...'}</pre>
                       )}
                     </div>
                   ))}
