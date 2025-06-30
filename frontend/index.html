@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App Portal</title>
-  <link rel="stylesheet" href="hf-theme.css">
+  <link rel="stylesheet" href="static/hf-theme.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -278,14 +278,14 @@
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="type">Run Type</label>
 
-                      <select id="type" className="mt-1 p-2 border rounded w-full text-black" value={runType} onChange={e => setRunType(e.target.value)}>
+                      <select id="type" className="mt-1 p-2 border rounded w-full text-gray-400" value={runType} onChange={e => setRunType(e.target.value)}>
                         <option value="gradio">Gradio</option>
                         <option value="docker">Docker</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="vram">Expected VRAM (MB)</label>
-                      <input id="vram" type="number" className="mt-1 p-2 border rounded w-full text-black" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+                      <input id="vram" type="number" className="mt-1 p-2 border rounded w-full text-gray-400" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
 
                     </div>
                     <div>
