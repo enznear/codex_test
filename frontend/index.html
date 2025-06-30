@@ -277,6 +277,7 @@
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="type">Run Type</label>
+
                       <select id="type" className="mt-1 p-2 border rounded w-full text-black" value={runType} onChange={e => setRunType(e.target.value)}>
                         <option value="gradio">Gradio</option>
                         <option value="docker">Docker</option>
@@ -285,6 +286,7 @@
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="vram">Expected VRAM (MB)</label>
                       <input id="vram" type="number" className="mt-1 p-2 border rounded w-full text-black" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="file">Upload File</label>
