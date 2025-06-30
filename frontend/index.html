@@ -277,14 +277,16 @@
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="type">Run Type</label>
-                      <select id="type" className="mt-1 p-2 border rounded w-full" value={runType} onChange={e => setRunType(e.target.value)}>
+
+                      <select id="type" className="mt-1 p-2 border rounded w-full text-black" value={runType} onChange={e => setRunType(e.target.value)}>
                         <option value="gradio">Gradio</option>
                         <option value="docker">Docker</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="vram">Expected VRAM (MB)</label>
-                      <input id="vram" type="number" className="mt-1 p-2 border rounded w-full" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+                      <input id="vram" type="number" className="mt-1 p-2 border rounded w-full text-black" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="file">Upload File</label>
@@ -321,7 +323,7 @@
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="tedit-vram">Expected VRAM (MB)</label>
-                              <input id="tedit-vram" type="number" className="border p-1 w-full" placeholder="0" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
+                              <input id="tedit-vram" type="number" className="border p-1 w-full text-black" placeholder="0" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <button onClick={saveTemplateEdit} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
