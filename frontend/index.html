@@ -148,6 +148,15 @@
     
     const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
 
+    const apiFetch = (url, options = {}) => {
+      const token = localStorage.getItem('token');
+      options.headers = options.headers || {};
+      if (token) {
+        options.headers['Authorization'] = 'Bearer ' + token;
+      }
+      return fetch(url, options);
+    };
+
     // 커스텀 드롭다운 컴포넌트
     const CustomSelect = ({ options, value, onChange, placeholder = "Select..." }) => {
       const [isOpen, setIsOpen] = useState(false);
@@ -266,6 +275,9 @@
     // Main App Component
     function AppRoutes() {
       const location = useLocation();
+      const [token, setToken] = useState(localStorage.getItem('token') || '');
+      const [username, setUsername] = useState('');
+      const [password, setPassword] = useState('');
       const [name, setName] = useState('');
       const [description, setDescription] = useState('');
       const [runType, setRunType] = useState('gradio');
@@ -292,27 +304,59 @@
         return () => document.removeEventListener('click', handleClickOutside);
       }, []);
 
+      if (!token) {
+        const handleLogin = (e) => {
+          e.preventDefault();
+          apiFetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ username, password })
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.access_token) {
+                localStorage.setItem('token', data.access_token);
+                setToken(data.access_token);
+              } else {
+                alert('Login failed');
+              }
+            })
+            .catch(() => alert('Login failed'));
+        };
+
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-gray-100">
+            <form onSubmit={handleLogin} className="bg-white p-6 rounded-lg shadow space-y-4">
+              <h2 className="text-xl font-semibold text-gray-900">Login</h2>
+              <input type="text" className="w-full border rounded p-2" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+              <input type="password" className="w-full border rounded p-2" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+              <button type="submit" className="btn-primary text-white w-full py-2 rounded">Login</button>
+            </form>
+          </div>
+        );
+      }
+
 
       useEffect(() => {
-        fetch('/status')
+        apiFetch('/status')
           .then(res => res.json())
           .then(data => setApps(data))
           .catch(() => {});
-        fetch('/templates')
+        apiFetch('/templates')
           .then(res => res.json())
           .then(data => setTemplates(data))
           .catch(() => {});
       }, []);
 
       const refreshStatus = () => {
-        fetch('/status')
+        apiFetch('/status')
           .then(res => res.json())
           .then(data => setApps(data));
       };
 
       const pollStatus = (appId) => {
         const interval = setInterval(() => {
-          fetch('/status')
+          apiFetch('/status')
             .then(res => res.json())
             .then(data => {
               setApps(data);
@@ -343,6 +387,10 @@
         formData.append('vram_required', vramRequired);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/upload');
+        const t = localStorage.getItem('token');
+        if (t) {
+          xhr.setRequestHeader('Authorization', 'Bearer ' + t);
+        }
         setUploadMsg('Upload started');
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -377,7 +425,7 @@
           setShowLogs(prev => ({ ...prev, [appId]: false }));
           return;
         }
-        fetch(`/logs/${appId}`)
+        apiFetch(`/logs/${appId}`)
           .then(res => res.text())
           .then(text => {
             setLogs(prev => ({ ...prev, [appId]: text }));
@@ -398,7 +446,7 @@
       };
 
       const stopApp = (id) => {
-        fetch(`/stop/${id}`, { method: 'POST' })
+        apiFetch(`/stop/${id}`, { method: 'POST' })
           .then(() => {
             refreshStatus();
             pollStatus(id);
@@ -407,14 +455,14 @@
       };
 
       const restartApp = (id) => {
-        fetch(`/restart/${id}`, { method: 'POST' })
+        apiFetch(`/restart/${id}`, { method: 'POST' })
           .then(() => refreshStatus())
           .catch(() => {});
       };
 
       const deleteApp = (id) => {
         if (!confirm('Delete this app?')) return;
-        fetch(`/apps/${id}`, { method: 'DELETE' })
+        apiFetch(`/apps/${id}`, { method: 'DELETE' })
           .then(() => {
             refreshStatus();
             setLogs(prev => { const n = { ...prev }; delete n[id]; return n; });
@@ -423,15 +471,15 @@
       };
 
       const deployTemplate = (id) => {
-        fetch(`/deploy_template/${id}`, { method: 'POST' })
+        apiFetch(`/deploy_template/${id}`, { method: 'POST' })
           .then(() => refreshStatus())
           .catch(() => {});
       };
 
       const saveTemplate = (id) => {
-        fetch(`/save_template/${id}`, { method: 'POST' })
+        apiFetch(`/save_template/${id}`, { method: 'POST' })
           .then(() => {
-            fetch('/templates')
+            apiFetch('/templates')
               .then(res => res.json())
               .then(data => setTemplates(data));
           })
@@ -440,9 +488,9 @@
 
       const deleteTemplate = (id) => {
         if (!confirm('Delete this template?')) return;
-        fetch(`/templates/${id}`, { method: 'DELETE' })
+        apiFetch(`/templates/${id}`, { method: 'DELETE' })
           .then(() => {
-            fetch('/templates')
+            apiFetch('/templates')
               .then(res => res.json())
               .then(data => setTemplates(data));
           })
@@ -464,7 +512,7 @@
       };
 
       const saveTemplateEdit = () => {
-        fetch('/edit_template', {
+        apiFetch('/edit_template', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -474,7 +522,7 @@
             vram_required: parseInt(tEditVram, 10) || 0
           })
         }).then(() => {
-          fetch('/templates')
+          apiFetch('/templates')
             .then(res => res.json())
             .then(data => setTemplates(data));
           cancelTemplateEdit();
@@ -494,7 +542,7 @@
       };
 
       const saveEdit = () => {
-        fetch('/edit_app', {
+        apiFetch('/edit_app', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ app_id: editId, name: editName, description: editDesc })
@@ -520,26 +568,32 @@
                 </div>
                 
                 <nav className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-                  <Link 
-                    to="/" 
+                  <Link
+                    to="/"
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                      location.pathname === '/' 
-                        ? 'bg-white text-gray-900 shadow-sm' 
+                      location.pathname === '/'
+                        ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     Create App
                   </Link>
-                  <Link 
-                    to="/apps" 
+                  <Link
+                    to="/apps"
                     className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                      location.pathname === '/apps' 
-                        ? 'bg-white text-gray-900 shadow-sm' 
+                      location.pathname === '/apps'
+                        ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     My Apps ({apps.length})
                   </Link>
+                  <button
+                    onClick={() => { localStorage.removeItem('token'); setToken(''); }}
+                    className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900"
+                  >
+                    Logout
+                  </button>
                 </nav>
               </div>
             </div>
