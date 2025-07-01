@@ -320,6 +320,8 @@
               if (data.access_token) {
                 localStorage.setItem('token', data.access_token);
                 setToken(data.access_token);
+                if (data.is_admin) setIsAdmin(true);
+
                 // Reload to ensure the main UI renders immediately
                 window.location.href = '/';
               } else {
@@ -622,9 +624,9 @@
                   <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-sm">AI</span>
                   </div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
                     AI App Portal
-                  </h1>
+                  </Link>
                 </div>
                 
                 <nav className="flex space-x-1 bg-gray-100 rounded-lg p-1">
@@ -661,7 +663,11 @@
                     </Link>
                   )}
                   <button
-                    onClick={() => { localStorage.removeItem('token'); setToken(''); }}
+                    onClick={() => {
+                      localStorage.removeItem('token');
+                      setToken('');
+                      window.location.href = '/';
+                    }}
                     className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900"
                   >
                     Logout
