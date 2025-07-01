@@ -1,7 +1,17 @@
 """FastAPI backend for MLOps app deployment."""
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks
+from fastapi import (
+    FastAPI,
+    UploadFile,
+    File,
+    HTTPException,
+    Form,
+    BackgroundTasks,
+    Depends,
+    status,
+)
 from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 import shutil
 import os
@@ -13,6 +23,9 @@ import re
 import time
 import asyncio
 import socket
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 DATABASE = "./app.db"
 UPLOAD_DIR = "./uploads"
@@ -26,6 +39,14 @@ PORT_END = int(os.environ.get("PORT_END", 9100))
 AVAILABLE_PORTS = set(range(PORT_START, PORT_END))
 app = FastAPI()
 
+# Authentication setup
+SECRET_KEY = os.environ.get("SECRET_KEY", "change_me")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
+
 # Serve the React frontend from the same origin
 app.mount("/static", StaticFiles(directory="frontend"), name="frontend")
 
@@ -36,6 +57,64 @@ async def frontend_index():
 
 # Allowed pattern for uploaded filenames
 ALLOWED_FILENAME = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    return pwd_context.verify(password, hashed)
+
+
+def create_access_token(
+    data: dict, expires_delta: timedelta | None = None
+) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_user(username: str):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id, username, password_hash FROM users WHERE username=?", (username,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {"id": row[0], "username": row[1], "password_hash": row[2]}
+    return None
+
+
+def authenticate_user(username: str, password: str):
+    user = get_user(username)
+    if not user:
+        return None
+    if not verify_password(password, user["password_hash"]):
+        return None
+    return user
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str | None = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = get_user(username)
+    if user is None:
+        raise credentials_exception
+    return user
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
@@ -71,6 +150,16 @@ def init_db():
         )
         """
     )
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            is_admin INTEGER DEFAULT 0
+        )
+        """
+    )
     # Add new columns if database existed before
     c.execute("PRAGMA table_info(apps)")
     cols = [row[1] for row in c.fetchall()]
@@ -90,6 +179,12 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN vram_required INTEGER")
     if "description" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN description TEXT")
+    # Add new columns to users table if needed
+    c.execute("PRAGMA table_info(users)")
+    u_cols = [row[1] for row in c.fetchall()]
+    if "is_admin" not in u_cols:
+        c.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
+
     # Add new columns to templates table if needed
     c.execute("PRAGMA table_info(templates)")
     t_cols = [row[1] for row in c.fetchall()]
@@ -100,6 +195,18 @@ def init_db():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(LOG_DIR, exist_ok=True)
     os.makedirs(TEMPLATE_DIR, exist_ok=True)
+
+    # Ensure admin user exists
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username='admin'")
+    if not c.fetchone():
+        c.execute(
+            "INSERT INTO users(username, password_hash, is_admin) VALUES(?, ?, 1)",
+            ("admin", get_password_hash(ADMIN_PASSWORD)),
+        )
+        conn.commit()
+    conn.close()
 
 init_db()
 
@@ -157,6 +264,35 @@ def is_port_free(port: int) -> bool:
         return False
     finally:
         s.close()
+
+
+@app.post("/register")
+async def register(username: str = Form(...), password: str = Form(...)):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username=?", (username,))
+    if c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="username already exists")
+    c.execute(
+        "INSERT INTO users(username, password_hash) VALUES(?, ?)",
+        (username, get_password_hash(password)),
+    )
+    conn.commit()
+    conn.close()
+    return {"detail": "user created"}
+
+
+@app.post("/login")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+    access_token = create_access_token({"sub": user["username"]})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 class StatusUpdate(BaseModel):
     app_id: str
@@ -262,6 +398,7 @@ async def upload_app(
     allow_ips: str = Form(None),
     auth_header: str = Form(None),
     vram_required: int = Form(0),
+    current_user: dict = Depends(get_current_user),
 ):
 
     """Receive user uploaded app and trigger agent build/run."""
@@ -422,6 +559,7 @@ async def upload_template(
     file: UploadFile = File(...),
     description: str = Form(""),
     vram_required: int = Form(0),
+    current_user: dict = Depends(get_current_user),
 ):
     """Upload a template archive or file."""
     template_id = str(uuid.uuid4())
@@ -919,7 +1057,7 @@ class EditTemplate(BaseModel):
 
 
 @app.post("/edit_app")
-async def edit_app(info: EditApp):
+async def edit_app(info: EditApp, current_user: dict = Depends(get_current_user)):
     """Update app name and description."""
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()

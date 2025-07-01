@@ -165,3 +165,28 @@ On the frontend the templates are loaded on page load and displayed with a **Dep
 Each uploaded app also shows a **Save Template** button to store it for future reuse.
 Templates display their name, description, type and VRAM, along with a **Delete** button to remove them.
 
+## Authentication
+
+An `admin` user is created automatically on first run. Set the `ADMIN_PASSWORD`
+environment variable to control the default password.
+
+Create a user account via the `/register` endpoint (or through the Register form on the login page):
+
+```bash
+curl -X POST -F "username=myuser" -F "password=mypass" http://localhost:8000/register
+```
+
+Then obtain a token using `/login`:
+
+```bash
+curl -X POST -d "username=myuser&password=mypass" http://localhost:8000/login
+```
+
+The response contains an `access_token` that must be included in the `Authorization` header when calling protected endpoints like `/upload` or `/templates`:
+
+```bash
+Authorization: Bearer <token>
+```
+
+The React frontend now prompts for login on first visit and stores the token in `localStorage`. A Register tab is available for creating additional users.
+
