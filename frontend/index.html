@@ -297,6 +297,7 @@
       const [tEditDesc, setTEditDesc] = useState('');
       const [tEditVram, setTEditVram] = useState('0');
       const [openMenus, setOpenMenus] = useState({});
+      const [mode, setMode] = useState('login');
       // Close any open kebab menus when clicking outside
       useEffect(() => {
         const handleClickOutside = () => setOpenMenus({});
@@ -324,6 +325,38 @@
             .catch(() => alert('Login failed'));
         };
 
+        const handleRegister = (e) => {
+          e.preventDefault();
+          apiFetch('/register', {
+            method: 'POST',
+            body: new URLSearchParams({ username, password })
+          })
+            .then(res => {
+              if (res.ok) {
+                alert('User created');
+                setMode('login');
+              } else {
+                alert('Registration failed');
+              }
+            })
+            .catch(() => alert('Registration failed'));
+        };
+
+        if (mode === 'register') {
+          return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-100">
+              <form onSubmit={handleRegister} className="bg-white p-6 rounded-lg shadow space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">Register</h2>
+                <input type="text" className="w-full border rounded p-2" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+                <input type="password" className="w-full border rounded p-2" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+                <button type="submit" className="btn-primary text-white w-full py-2 rounded">Register</button>
+                <p className="text-sm text-center"><a href="#" onClick={() => setMode('login')} className="text-blue-600">Back to login</a></p>
+              </form>
+            </div>
+          );
+        }
+
+
         return (
           <div className="min-h-screen flex items-center justify-center bg-gray-100">
             <form onSubmit={handleLogin} className="bg-white p-6 rounded-lg shadow space-y-4">
@@ -331,6 +364,7 @@
               <input type="text" className="w-full border rounded p-2" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
               <input type="password" className="w-full border rounded p-2" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
               <button type="submit" className="btn-primary text-white w-full py-2 rounded">Login</button>
+              <p className="text-sm text-center"><a href="#" onClick={() => setMode('register')} className="text-blue-600">Register</a></p>
             </form>
           </div>
         );

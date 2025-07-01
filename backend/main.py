@@ -45,6 +45,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
+
 
 # Serve the React frontend from the same origin
 app.mount("/static", StaticFiles(directory="frontend"), name="frontend")
@@ -154,7 +156,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
-            password_hash TEXT
+            password_hash TEXT,
+            is_admin INTEGER DEFAULT 0
         )
         """
     )
@@ -177,6 +180,12 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN vram_required INTEGER")
     if "description" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN description TEXT")
+    # Add new columns to users table if needed
+    c.execute("PRAGMA table_info(users)")
+    u_cols = [row[1] for row in c.fetchall()]
+    if "is_admin" not in u_cols:
+        c.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
+
     # Add new columns to templates table if needed
     c.execute("PRAGMA table_info(templates)")
     t_cols = [row[1] for row in c.fetchall()]
@@ -187,6 +196,18 @@ def init_db():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(LOG_DIR, exist_ok=True)
     os.makedirs(TEMPLATE_DIR, exist_ok=True)
+
+    # Ensure admin user exists
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE username='admin'")
+    if not c.fetchone():
+        c.execute(
+            "INSERT INTO users(username, password_hash, is_admin) VALUES(?, ?, 1)",
+            ("admin", get_password_hash(ADMIN_PASSWORD)),
+        )
+        conn.commit()
+    conn.close()
 
 init_db()
 
