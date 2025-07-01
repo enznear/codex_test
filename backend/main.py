@@ -47,6 +47,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 
+
 # Serve the React frontend from the same origin
 app.mount("/static", StaticFiles(directory="frontend"), name="frontend")
 

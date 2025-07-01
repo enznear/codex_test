@@ -172,6 +172,7 @@ environment variable to control the default password.
 
 Create a user account via the `/register` endpoint (or through the Register form on the login page):
 
+
 ```bash
 curl -X POST -F "username=myuser" -F "password=mypass" http://localhost:8000/register
 ```
@@ -189,4 +190,5 @@ Authorization: Bearer <token>
 ```
 
 The React frontend now prompts for login on first visit and stores the token in `localStorage`. A Register tab is available for creating additional users.
+
 
