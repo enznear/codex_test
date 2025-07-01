@@ -1025,3 +1025,9 @@ async def startup_event():
 
 
 # Example: run with `uvicorn backend.main:app --reload`
+
+
+@app.get("/{path:path}", include_in_schema=False)
+async def spa_fallback(path: str):
+    """Serve index.html for client-side routes."""
+    return FileResponse("frontend/index.html")
