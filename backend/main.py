@@ -350,7 +350,22 @@ async def reset_password(
     new_password: str = Form(...),
     current_user: dict = Depends(get_current_user),
 ):
-=======
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="admin only")
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE id=?", (user_id,))
+    if not c.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="user not found")
+    c.execute(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        (get_password_hash(new_password), user_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"detail": "password reset"}
+
 @app.get("/users/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return {
