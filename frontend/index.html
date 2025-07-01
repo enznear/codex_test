@@ -146,6 +146,8 @@
             return { class: 'status-stopping pulse', text: 'Stopping', bg: 'bg-yellow-100', text_color: 'text-yellow-800' };
           case 'starting':
             return { class: 'status-starting pulse', text: 'Starting', bg: 'bg-blue-100', text_color: 'text-blue-800' };
+          case 'building':
+            return { class: 'status-starting pulse', text: 'Building', bg: 'bg-blue-100', text_color: 'text-blue-800' };
           default:
             return { class: 'status-stopped', text: 'Unknown', bg: 'bg-gray-100', text_color: 'text-gray-800' };
         }
@@ -192,6 +194,7 @@
       const [tEditName, setTEditName] = useState('');
       const [tEditDesc, setTEditDesc] = useState('');
       const [tEditVram, setTEditVram] = useState('0');
+      const [openMenus, setOpenMenus] = useState({});
 
       useEffect(() => {
         fetch('/status')
@@ -287,6 +290,14 @@
             setLogs(prev => ({ ...prev, [appId]: 'Failed to load logs.' }));
             setShowLogs(prev => ({ ...prev, [appId]: true }));
         });
+      };
+
+      const toggleMenu = (appId) => {
+        setOpenMenus(prev => ({ ...prev, [appId]: !prev[appId] }));
+      };
+
+      const closeMenu = (appId) => {
+        setOpenMenus(prev => ({ ...prev, [appId]: false }));
       };
 
       const stopApp = (id) => {
@@ -687,9 +698,39 @@
                           className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-6 card-hover cursor-pointer relative overflow-hidden"
                           onClick={() => app.url && window.open(`${nginxBase}${app.url}`, '_blank')}
                         >
-                          {/* Status indicator overlay */}
-                          <div className="absolute top-4 right-4">
+                          {/* Status indicator overlay with actions */}
+                          <div className="absolute top-4 right-4 flex items-center space-x-2 z-10" onClick={e => e.stopPropagation()}>
                             <StatusBadge status={app.status} />
+                            <div className="relative">
+                              <button onClick={() => toggleMenu(app.id)} className="p-1 rounded hover:bg-gray-100">
+                                ⋮
+                              </button>
+                              {openMenus[app.id] && (
+                                <div className="absolute right-0 mt-2 w-32 bg-white border rounded shadow-lg">
+                                  <button onClick={() => { toggleLogs(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
+                                    {showLogs[app.id] ? 'Hide Logs' : 'Logs'}
+                                  </button>
+                                  <button onClick={() => { startEdit(app); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
+                                    Edit
+                                  </button>
+                                  {app.status === 'running' ? (
+                                    <button onClick={() => { stopApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
+                                      Stop
+                                    </button>
+                                  ) : (
+                                    <button onClick={() => { restartApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
+                                      Start
+                                    </button>
+                                  )}
+                                  <button onClick={() => { saveTemplate(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
+                                    Template
+                                  </button>
+                                  <button onClick={() => { deleteApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-red-600">
+                                    Delete App
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="mb-4">
@@ -721,29 +762,29 @@
                           
                           {editId === app.id ? (
                             <div className="space-y-3 mt-4" onClick={e => e.stopPropagation()}>
-                              <input 
-                                type="text" 
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
-                                placeholder="App Name" 
-                                value={editName} 
-                                onChange={e => setEditName(e.target.value)} 
+                              <input
+                                type="text"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="App Name"
+                                value={editName}
+                                onChange={e => setEditName(e.target.value)}
                               />
-                              <textarea 
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" 
-                                placeholder="Description" 
+                              <textarea
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                                placeholder="Description"
                                 rows="2"
-                                value={editDesc} 
-                                onChange={e => setEditDesc(e.target.value)} 
+                                value={editDesc}
+                                onChange={e => setEditDesc(e.target.value)}
                               />
                               <div className="flex space-x-2">
-                                <button 
-                                  onClick={saveEdit} 
+                                <button
+                                  onClick={saveEdit}
                                   className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium flex-1"
                                 >
                                   Save
                                 </button>
-                                <button 
-                                  onClick={cancelEdit} 
+                                <button
+                                  onClick={cancelEdit}
                                   className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium"
                                 >
                                   Cancel
@@ -751,60 +792,7 @@
                               </div>
                             </div>
                           ) : (
-                            <div className="space-y-3">
-                              {/* Action buttons */}
-                              <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
-                                <button 
-                                  onClick={() => toggleLogs(app.id)} 
-                                  className="bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors flex items-center justify-center space-x-1"
-                                >
-                                  <span>📋</span>
-                                  <span>{showLogs[app.id] ? 'Hide' : 'Logs'}</span>
-                                </button>
-                                
-                                <button 
-                                  onClick={() => startEdit(app)} 
-                                  className="bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors flex items-center justify-center space-x-1"
-                                >
-                                  <span>✏️</span>
-                                  <span>Edit</span>
-                                </button>
-                                
-                                {app.status === 'running' ? (
-                                  <button 
-                                    onClick={() => stopApp(app.id)} 
-                                    className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-yellow-100 transition-colors flex items-center justify-center space-x-1"
-                                  >
-                                    <span>⏹️</span>
-                                    <span>Stop</span>
-                                  </button>
-                                ) : (
-                                  <button 
-                                    onClick={() => restartApp(app.id)} 
-                                    className="bg-green-50 text-green-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-green-100 transition-colors flex items-center justify-center space-x-1"
-                                  >
-                                    <span>▶️</span>
-                                    <span>Start</span>
-                                  </button>
-                                )}
-                                
-                                <button 
-                                  onClick={() => saveTemplate(app.id)} 
-                                  className="bg-blue-50 text-blue-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-100 transition-colors flex items-center justify-center space-x-1"
-                                >
-                                  <span>💾</span>
-                                  <span>Template</span>
-                                </button>
-                              </div>
-                              
-                              <button 
-                                onClick={() => deleteApp(app.id)} 
-                                className="w-full bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-red-100 transition-colors flex items-center justify-center space-x-1"
-                              >
-                                <span>🗑️</span>
-                                <span>Delete App</span>
-                              </button>
-                            </div>
+                            <></>
                           )}
                           
                           {/* Logs panel */}
