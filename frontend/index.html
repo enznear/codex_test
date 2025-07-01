@@ -284,6 +284,7 @@
       const [vramRequired, setVramRequired] = useState('0');
       const [files, setFiles] = useState([]);
       const [apps, setApps] = useState([]);
+      const [users, setUsers] = useState([]);
       const [logs, setLogs] = useState({});
       const [showLogs, setShowLogs] = useState({});
       const [uploadMsg, setUploadMsg] = useState('');
@@ -297,6 +298,7 @@
       const [tEditDesc, setTEditDesc] = useState('');
       const [tEditVram, setTEditVram] = useState('0');
       const [openMenus, setOpenMenus] = useState({});
+      const [isAdmin, setIsAdmin] = useState(false);
       const [mode, setMode] = useState('login');
       // Close any open kebab menus when clicking outside
       useEffect(() => {
@@ -318,6 +320,8 @@
               if (data.access_token) {
                 localStorage.setItem('token', data.access_token);
                 setToken(data.access_token);
+                // Reload to ensure the main UI renders immediately
+                window.location.href = '/';
               } else {
                 alert('Login failed');
               }
@@ -380,7 +384,11 @@
           .then(res => res.json())
           .then(data => setTemplates(data))
           .catch(() => {});
-      }, []);
+        apiFetch('/users/me')
+          .then(res => res.ok ? res.json() : null)
+          .then(data => { if (data) { setIsAdmin(data.is_admin); } })
+          .catch(() => {});
+      }, [token]);
 
       const refreshStatus = () => {
         apiFetch('/status')
@@ -407,6 +415,15 @@
         const interval = setInterval(refreshStatus, 2000);
         return () => clearInterval(interval);
       }, []);
+
+      useEffect(() => {
+        if (isAdmin) {
+          apiFetch('/users')
+            .then(res => res.json())
+            .then(data => setUsers(data))
+            .catch(() => {});
+        }
+      }, [isAdmin]);
 
       const handleUpload = (e) => {
         e.preventDefault();
@@ -531,6 +548,15 @@
           .catch(() => {});
       };
 
+      const deleteUser = (id) => {
+        if (!confirm('Delete this user?')) return;
+        apiFetch(`/users/${id}`, { method: 'DELETE' })
+          .then(() => {
+            setUsers(prev => prev.filter(u => u.id !== id));
+          })
+          .catch(() => {});
+      };
+
       const startTemplateEdit = (t) => {
         setTEditId(t.id);
         setTEditName(t.name || '');
@@ -622,6 +648,18 @@
                   >
                     My Apps ({apps.length})
                   </Link>
+                  {isAdmin && (
+                    <Link
+                      to="/user-admin"
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                        location.pathname === '/user-admin'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Users
+                    </Link>
+                  )}
                   <button
                     onClick={() => { localStorage.removeItem('token'); setToken(''); }}
                     className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900"
@@ -1025,6 +1063,33 @@
                   )}
                 </div>
               </Route>
+              {isAdmin && (
+                <Route path="/user-admin">
+                  <div className="space-y-6">
+                    <div className="text-center mb-8">
+                      <h2 className="text-3xl font-bold text-gray-900 mb-2">User Management</h2>
+                    </div>
+                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-8">
+                      {users.length === 0 ? (
+                        <p className="text-gray-500">No users.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {users.map(u => (
+                            <li key={u.id} className="flex justify-between items-center border rounded px-3 py-2">
+                              <span>{u.username}{u.is_admin ? ' (admin)' : ''}</span>
+                              {!u.is_admin && (
+                                <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:underline">
+                                  Delete
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </Route>
+              )}
             </Switch>
           </main>
           
