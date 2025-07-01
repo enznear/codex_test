@@ -195,6 +195,13 @@
       const [tEditDesc, setTEditDesc] = useState('');
       const [tEditVram, setTEditVram] = useState('0');
       const [openMenus, setOpenMenus] = useState({});
+      // Close any open kebab menus when clicking outside
+      useEffect(() => {
+        const handleClickOutside = () => setOpenMenus({});
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+      }, []);
+
 
       useEffect(() => {
         fetch('/status')
@@ -702,8 +709,12 @@
                           <div className="absolute top-4 right-4 flex items-center space-x-2 z-10" onClick={e => e.stopPropagation()}>
                             <StatusBadge status={app.status} />
                             <div className="relative">
-                              <button onClick={() => toggleMenu(app.id)} className="p-1 rounded hover:bg-gray-100">
-                                ⋮
+                              <button
+                                onClick={e => { e.stopPropagation(); toggleMenu(app.id); }}
+                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
+                              >
+                                ⋯
+
                               </button>
                               {openMenus[app.id] && (
                                 <div className="absolute right-0 mt-2 w-32 bg-white border rounded shadow-lg">
