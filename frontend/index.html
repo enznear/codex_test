@@ -321,6 +321,7 @@
                 localStorage.setItem('token', data.access_token);
                 setToken(data.access_token);
                 if (data.is_admin) setIsAdmin(true);
+
                 // Reload to ensure the main UI renders immediately
                 window.location.href = '/';
               } else {
