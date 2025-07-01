@@ -3,23 +3,174 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>App Portal</title>
-  <link rel="stylesheet" href="static/hf-theme.css">
+  <title>AI App Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-router-dom@5.3.4/umd/react-router-dom.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+            },
+            gray: {
+              50: '#f9fafb',
+              100: '#f3f4f6',
+              200: '#e5e7eb',
+              300: '#d1d5db',
+              400: '#9ca3af',
+              500: '#6b7280',
+              600: '#4b5563',
+              700: '#374151',
+              800: '#1f2937',
+              900: '#111827',
+            }
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.3s ease-in-out',
+            'slide-up': 'slideUp 0.3s ease-out',
+            'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            slideUp: {
+              '0%': { transform: 'translateY(10px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .status-indicator {
+      position: relative;
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status-running { background-color: #10b981; }
+    .status-stopped { background-color: #ef4444; }
+    .status-stopping { background-color: #f59e0b; }
+    .status-starting { background-color: #3b82f6; }
+    .status-indicator.pulse::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: inherit;
+      animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+    @keyframes ping {
+      75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+      }
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+    .card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    }
+    .upload-area {
+      border: 2px dashed #d1d5db;
+      transition: all 0.3s ease;
+    }
+    .upload-area:hover {
+      border-color: #667eea;
+      background-color: rgba(102, 126, 234, 0.05);
+    }
+    .progress-bar {
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      transition: width 0.3s ease;
+    }
+  </style>
 </head>
-<body class="min-h-screen">
-  <div id="root" class="container mx-auto p-4"></div>
+<body class="font-sans">
+  <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect } = React;
     const { BrowserRouter, Switch, Route, Link, useLocation } = ReactRouterDOM;
-    // Nginx serves apps on port 8080
+    
     const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
 
+    // Status Badge Component
+    const StatusBadge = ({ status }) => {
+      const getStatusInfo = (status) => {
+        switch (status) {
+          case 'running':
+            return { class: 'status-running pulse', text: 'Running', bg: 'bg-green-100', text_color: 'text-green-800' };
+          case 'stopped':
+            return { class: 'status-stopped', text: 'Stopped', bg: 'bg-red-100', text_color: 'text-red-800' };
+          case 'stopping':
+            return { class: 'status-stopping pulse', text: 'Stopping', bg: 'bg-yellow-100', text_color: 'text-yellow-800' };
+          case 'starting':
+            return { class: 'status-starting pulse', text: 'Starting', bg: 'bg-blue-100', text_color: 'text-blue-800' };
+          default:
+            return { class: 'status-stopped', text: 'Unknown', bg: 'bg-gray-100', text_color: 'text-gray-800' };
+        }
+      };
+
+      const statusInfo = getStatusInfo(status);
+      
+      return (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.text_color}`}>
+          <span className={`status-indicator ${statusInfo.class} mr-1.5`}></span>
+          {statusInfo.text}
+        </span>
+      );
+    };
+
+    // Progress Bar Component
+    const ProgressBar = ({ progress }) => (
+      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+        <div 
+          className="progress-bar h-2 rounded-full" 
+          style={{ width: `${progress}%` }}
+        ></div>
+      </div>
+    );
+
+    // Main App Component
     function AppRoutes() {
       const location = useLocation();
       const [name, setName] = useState('');
@@ -44,9 +195,7 @@
       useEffect(() => {
         fetch('/status')
           .then(res => res.json())
-          .then(data => {
-            setApps(data);
-          })
+          .then(data => setApps(data))
           .catch(() => {});
         fetch('/templates')
           .then(res => res.json())
@@ -57,9 +206,7 @@
       const refreshStatus = () => {
         fetch('/status')
           .then(res => res.json())
-          .then(data => {
-            setApps(data);
-          });
+          .then(data => setApps(data));
       };
 
       const pollStatus = (appId) => {
@@ -78,9 +225,7 @@
       };
 
       useEffect(() => {
-        const interval = setInterval(() => {
-          refreshStatus();
-        }, 2000);
+        const interval = setInterval(refreshStatus, 2000);
         return () => clearInterval(interval);
       }, []);
 
@@ -154,9 +299,7 @@
 
       const restartApp = (id) => {
         fetch(`/restart/${id}`, { method: 'POST' })
-          .then(() => {
-            refreshStatus();
-          })
+          .then(() => refreshStatus())
           .catch(() => {});
       };
 
@@ -171,9 +314,7 @@
 
       const deployTemplate = (id) => {
         fetch(`/deploy_template/${id}`, { method: 'POST' })
-          .then(() => {
-            refreshStatus();
-          })
+          .then(() => refreshStatus())
           .catch(() => {});
       };
 
@@ -229,7 +370,6 @@
         }).catch(() => {});
       };
 
-
       const startEdit = (app) => {
         setEditId(app.id);
         setEditName(app.name || '');
@@ -254,149 +394,458 @@
       };
 
       return (
-        <div>
-            <header className="topbar flex items-center justify-between mb-6 p-4 rounded">
-              <h1 className="text-xl font-semibold">AI App Portal</h1>
-              <nav className="space-x-4">
-                <Link to="/" className={`px-3 py-1 rounded ${location.pathname === '/' ? 'bg-gray-200 dark:bg-gray-700' : ''}`}>Create</Link>
-                <Link to="/apps" className={`px-3 py-1 rounded ${location.pathname === '/apps' ? 'bg-gray-200 dark:bg-gray-700' : ''}`}>Running Apps</Link>
-              </nav>
-            </header>
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+          {/* Header */}
+          <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-6">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">AI</span>
+                  </div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                    AI App Portal
+                  </h1>
+                </div>
+                
+                <nav className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+                  <Link 
+                    to="/" 
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                      location.pathname === '/' 
+                        ? 'bg-white text-gray-900 shadow-sm' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Create App
+                  </Link>
+                  <Link 
+                    to="/apps" 
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                      location.pathname === '/apps' 
+                        ? 'bg-white text-gray-900 shadow-sm' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    My Apps ({apps.length})
+                  </Link>
+                </nav>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Switch>
               <Route exact path="/">
-                <>
-                  <div className="grid gap-4 lg:grid-cols-2">
-                      <form onSubmit={handleUpload} className="card p-4 rounded mb-2 grid gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="name">App Name</label>
-                        <input id="name" type="text" className="mt-1 p-2 border rounded w-full" placeholder="My Awesome App" value={name} onChange={e => setName(e.target.value)} />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Upload Form */}
+                  <div className="space-y-6">
+                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-8 card-hover">
+                      <div className="flex items-center space-x-3 mb-6">
+                        <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                          <span className="text-white text-lg">+</span>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Deploy New App</h2>
                       </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="desc">Description</label>
-                      <input id="desc" type="text" className="mt-1 p-2 border rounded w-full" placeholder="Short description" value={description} onChange={e => setDescription(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="type">Run Type</label>
-
-                      <select id="type" className="mt-1 p-2 border rounded w-full text-gray-400" value={runType} onChange={e => setRunType(e.target.value)}>
-                        <option value="gradio">Gradio</option>
-                        <option value="docker">Docker</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="vram">Expected VRAM (MB)</label>
-                      <input id="vram" type="number" className="mt-1 p-2 border rounded w-full text-gray-400" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
-
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="file">Upload File</label>
-                      <input id="file" type="file" className="mt-1 p-2 border rounded w-full" onChange={e => setFiles(e.target.files)} multiple />
-                    </div>
-                    <button type="submit" className="hf-btn py-2 px-4 rounded hover:opacity-90">Upload</button>
-                  </form>
-                  <div className="card p-4 rounded mb-4 lg:mb-0">
-                    <h2 className="text-xl font-bold mb-2">Templates</h2>
-                    {templates.map(t => (
-                      <div key={t.id} className="flex flex-col mb-2">
-                        <div className="flex justify-between items-center">
+                      
+                      <form onSubmit={handleUpload} className="space-y-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">App Name</label>
+                          <input 
+                            type="text" 
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200" 
+                            placeholder="My Awesome AI App" 
+                            value={name} 
+                            onChange={e => setName(e.target.value)} 
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                          <textarea 
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 resize-none" 
+                            placeholder="Brief description of your app..." 
+                            rows="3"
+                            value={description} 
+                            onChange={e => setDescription(e.target.value)} 
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <p className="font-semibold">{t.name}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{t.description}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Type: {t.type}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">VRAM: {t.vram_required}</p>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Runtime</label>
+                            <select 
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200" 
+                              value={runType} 
+                              onChange={e => setRunType(e.target.value)}
+                            >
+                              <option value="gradio">Gradio</option>
+                              <option value="docker">Docker</option>
+                            </select>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button onClick={() => deployTemplate(t.id)} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Deploy</button>
-                            <button onClick={() => startTemplateEdit(t)} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">Edit</button>
-                            <button onClick={() => deleteTemplate(t.id)} className="bg-red-200 px-3 py-1 rounded text-sm text-black hover:bg-red-300">Delete</button>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">VRAM (MB)</label>
+                            <input 
+                              type="number" 
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200" 
+                              placeholder="0" 
+                              value={vramRequired} 
+                              onChange={e => setVramRequired(e.target.value)} 
+                            />
                           </div>
                         </div>
-                        {tEditId === t.id && (
-                          <div className="mt-2 space-y-2">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="tedit-name">Template Name</label>
-                              <input id="tedit-name" type="text" className="border p-1 w-full" placeholder="Template Name" value={tEditName} onChange={e => setTEditName(e.target.value)} />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="tedit-desc">Description</label>
-                              <input id="tedit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={tEditDesc} onChange={e => setTEditDesc(e.target.value)} />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="tedit-vram">Expected VRAM (MB)</label>
-                              <input id="tedit-vram" type="number" className="border p-1 w-full text-black" placeholder="0" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <button onClick={saveTemplateEdit} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
-                              <button onClick={cancelTemplateEdit} className="bg-gray-200 px-2 py-1 rounded text-black">Cancel</button>
-                            </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Files</label>
+                          <div className="upload-area border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              id="file-upload"
+                              onChange={e => setFiles(e.target.files)} 
+                              multiple 
+                            />
+                            <label htmlFor="file-upload" className="cursor-pointer">
+                              <div className="text-gray-400 mb-2">
+                                <svg className="mx-auto h-12 w-12" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                Click to upload or drag and drop
+                              </p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                ZIP, PY, or any project files
+                              </p>
+                            </label>
+                            {files.length > 0 && (
+                              <p className="mt-2 text-sm text-indigo-600 font-medium">
+                                {files.length} file(s) selected
+                              </p>
+                            )}
                           </div>
+                        </div>
+                        
+                        <button 
+                          type="submit" 
+                          className="w-full btn-primary text-white py-3 px-6 rounded-lg font-medium shadow-lg"
+                        >
+                          Deploy App
+                        </button>
+                      </form>
+                      
+                      {uploadProgress > 0 && uploadProgress < 100 && (
+                        <div className="mt-4">
+                          <div className="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Uploading...</span>
+                            <span>{uploadProgress}%</span>
+                          </div>
+                          <ProgressBar progress={uploadProgress} />
+                        </div>
+                      )}
+                      
+                      {uploadMsg && (
+                        <div className={`mt-4 p-3 rounded-lg text-sm ${
+                          uploadMsg.includes('Error') 
+                            ? 'bg-red-50 text-red-700 border border-red-200' 
+                            : 'bg-green-50 text-green-700 border border-green-200'
+                        }`}>
+                          {uploadMsg}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Templates */}
+                  <div className="space-y-6">
+                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-8 card-hover">
+                      <div className="flex items-center space-x-3 mb-6">
+                        <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+                          <span className="text-white text-lg">⚡</span>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900">Quick Deploy Templates</h2>
+                      </div>
+                      
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {templates.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <p>No templates available yet.</p>
+                            <p className="text-sm mt-1">Deploy an app first, then save it as a template!</p>
+                          </div>
+                        ) : (
+                          templates.map(t => (
+                            <div key={t.id} className="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 transition-all duration-200">
+                              {tEditId === t.id ? (
+                                <div className="space-y-3">
+                                  <input 
+                                    type="text" 
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                                    placeholder="Template Name" 
+                                    value={tEditName} 
+                                    onChange={e => setTEditName(e.target.value)} 
+                                  />
+                                  <textarea 
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" 
+                                    placeholder="Description" 
+                                    rows="2"
+                                    value={tEditDesc} 
+                                    onChange={e => setTEditDesc(e.target.value)} 
+                                  />
+                                  <input 
+                                    type="number" 
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                                    placeholder="VRAM (MB)" 
+                                    value={tEditVram} 
+                                    onChange={e => setTEditVram(e.target.value)} 
+                                  />
+                                  <div className="flex space-x-2">
+                                    <button 
+                                      onClick={saveTemplateEdit} 
+                                      className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium"
+                                    >
+                                      Save
+                                    </button>
+                                    <button 
+                                      onClick={cancelTemplateEdit} 
+                                      className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                      <h3 className="font-medium text-gray-900">{t.name}</h3>
+                                      <p className="text-sm text-gray-600 mt-1">{t.description}</p>
+                                      <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                        <span>Type: {t.type}</span>
+                                        <span>VRAM: {t.vram_required} MB</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex space-x-2">
+                                    <button 
+                                      onClick={() => deployTemplate(t.id)} 
+                                      className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium flex-1"
+                                    >
+                                      Deploy
+                                    </button>
+                                    <button 
+                                      onClick={() => startTemplateEdit(t)} 
+                                      className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button 
+                                      onClick={() => deleteTemplate(t.id)} 
+                                      className="bg-red-50 text-red-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-100 transition-colors"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ))
                         )}
                       </div>
-                    ))}
+                    </div>
                   </div>
+                </div>
+              </Route>
+              
+              <Route path="/apps">
+                <div className="space-y-6">
+                  <div className="text-center mb-8">
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Your AI Applications</h2>
+                    <p className="text-gray-600">Manage and monitor your deployed applications</p>
                   </div>
-                  {uploadProgress > 0 && uploadProgress < 100 && (
-                    <div className="w-full bg-gray-200 h-2 mt-2 rounded">
-                      <div className="bg-blue-600 h-2 rounded" style={{width: `${uploadProgress}%`}}></div>
+                  
+                  {apps.length === 0 ? (
+                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-12 text-center">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl text-gray-400">📱</span>
+                      </div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No apps deployed yet</h3>
+                      <p className="text-gray-600 mb-6">Get started by creating your first AI application</p>
+                      <Link 
+                        to="/" 
+                        className="btn-primary text-white px-6 py-3 rounded-lg font-medium inline-block"
+                      >
+                        Create Your First App
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                      {apps.map(app => (
+                        <div
+                          key={app.id}
+                          className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-6 card-hover cursor-pointer relative overflow-hidden"
+                          onClick={() => app.url && window.open(`${nginxBase}${app.url}`, '_blank')}
+                        >
+                          {/* Status indicator overlay */}
+                          <div className="absolute top-4 right-4">
+                            <StatusBadge status={app.status} />
+                          </div>
+                          
+                          <div className="mb-4">
+                            <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mb-3">
+                              <span className="text-white font-bold">
+                                {(app.name || app.id).charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            
+                            <h3 className="text-xl font-semibold text-gray-900 mb-1 pr-20">
+                              {app.name || app.id}
+                            </h3>
+                            <p className="text-xs text-gray-500 font-mono">ID: {app.id}</p>
+                            
+                            {app.description && (
+                              <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                {app.description}
+                              </p>
+                            )}
+                            
+                            {app.gpu !== null && app.gpu !== undefined && (
+                              <div className="mt-3 flex items-center space-x-2">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                  🎮 GPU {app.gpu}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {editId === app.id ? (
+                            <div className="space-y-3 mt-4" onClick={e => e.stopPropagation()}>
+                              <input 
+                                type="text" 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent" 
+                                placeholder="App Name" 
+                                value={editName} 
+                                onChange={e => setEditName(e.target.value)} 
+                              />
+                              <textarea 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" 
+                                placeholder="Description" 
+                                rows="2"
+                                value={editDesc} 
+                                onChange={e => setEditDesc(e.target.value)} 
+                              />
+                              <div className="flex space-x-2">
+                                <button 
+                                  onClick={saveEdit} 
+                                  className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium flex-1"
+                                >
+                                  Save
+                                </button>
+                                <button 
+                                  onClick={cancelEdit} 
+                                  className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {/* Action buttons */}
+                              <div className="grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
+                                <button 
+                                  onClick={() => toggleLogs(app.id)} 
+                                  className="bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors flex items-center justify-center space-x-1"
+                                >
+                                  <span>📋</span>
+                                  <span>{showLogs[app.id] ? 'Hide' : 'Logs'}</span>
+                                </button>
+                                
+                                <button 
+                                  onClick={() => startEdit(app)} 
+                                  className="bg-gray-50 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors flex items-center justify-center space-x-1"
+                                >
+                                  <span>✏️</span>
+                                  <span>Edit</span>
+                                </button>
+                                
+                                {app.status === 'running' ? (
+                                  <button 
+                                    onClick={() => stopApp(app.id)} 
+                                    className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-yellow-100 transition-colors flex items-center justify-center space-x-1"
+                                  >
+                                    <span>⏹️</span>
+                                    <span>Stop</span>
+                                  </button>
+                                ) : (
+                                  <button 
+                                    onClick={() => restartApp(app.id)} 
+                                    className="bg-green-50 text-green-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-green-100 transition-colors flex items-center justify-center space-x-1"
+                                  >
+                                    <span>▶️</span>
+                                    <span>Start</span>
+                                  </button>
+                                )}
+                                
+                                <button 
+                                  onClick={() => saveTemplate(app.id)} 
+                                  className="bg-blue-50 text-blue-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-100 transition-colors flex items-center justify-center space-x-1"
+                                >
+                                  <span>💾</span>
+                                  <span>Template</span>
+                                </button>
+                              </div>
+                              
+                              <button 
+                                onClick={() => deleteApp(app.id)} 
+                                className="w-full bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-red-100 transition-colors flex items-center justify-center space-x-1"
+                              >
+                                <span>🗑️</span>
+                                <span>Delete App</span>
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Logs panel */}
+                          {showLogs[app.id] && (
+                            <div className="mt-4 border-t border-gray-200 pt-4" onClick={e => e.stopPropagation()}>
+                              <div className="bg-gray-900 rounded-lg p-4 max-h-48 overflow-auto">
+                                <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap">
+                                  {logs[app.id] || 'Loading logs...'}
+                                </pre>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Click indicator */}
+                          {app.url && app.status === 'running' && (
+                            <div className="absolute bottom-1 left-6 text-xs text-gray-400">
+                              Click to open app →
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
-                  {uploadMsg && <p className="text-sm mt-2">{uploadMsg}</p>}
-                </>
-              </Route>
-              <Route path="/apps">
-                <div className="grid gap-4 lg:grid-cols-2">
-                  {apps.map(app => (
-                    <div
-                      key={app.id}
-                      className="card p-4 rounded cursor-pointer"
-                      onClick={() => app.url && window.open(`${nginxBase}${app.url}`, '_blank')}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h2 className="font-semibold">{app.name || app.id}</h2>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">ID: {app.id}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Status: {app.status}</p>
-                          {app.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{app.description}</p>
-                          )}
-                          {app.gpu !== null && app.gpu !== undefined && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">GPU: {app.gpu}</p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); toggleLogs(app.id); }} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</button>
-                          <button onClick={(e) => { e.stopPropagation(); stopApp(app.id); }} className="bg-yellow-200 px-3 py-1 rounded text-sm text-black hover:bg-yellow-300">Stop</button>
-                          <button onClick={(e) => { e.stopPropagation(); restartApp(app.id); }} className="bg-blue-200 px-3 py-1 rounded text-sm text-black hover:bg-blue-300">Restart</button>
-                          <button onClick={(e) => { e.stopPropagation(); startEdit(app); }} className="bg-gray-200 px-3 py-1 rounded text-sm text-black hover:bg-gray-300">Edit</button>
-                          <button onClick={(e) => { e.stopPropagation(); saveTemplate(app.id); }} className="hf-btn px-3 py-1 rounded text-sm hover:opacity-90">Save Template</button>
-                          <button onClick={(e) => { e.stopPropagation(); deleteApp(app.id); }} className="bg-red-200 px-3 py-1 rounded text-sm text-black hover:bg-red-300">Delete</button>
-                        </div>
-                      </div>
-                      {editId === app.id && (
-                        <div className="mt-2 space-y-2">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="edit-name">App Name</label>
-                            <input id="edit-name" type="text" className="border p-1 w-full" placeholder="App Name" value={editName} onClick={e => e.stopPropagation()} onChange={e => setEditName(e.target.value)} />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="edit-desc">Description</label>
-                            <input id="edit-desc" type="text" className="border p-1 w-full" placeholder="Description" value={editDesc} onClick={e => e.stopPropagation()} onChange={e => setEditDesc(e.target.value)} />
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); saveEdit(); }} className="hf-btn px-2 py-1 rounded hover:opacity-90">Save</button>
-                            <button onClick={(e) => { e.stopPropagation(); cancelEdit(); }} className="bg-gray-200 px-2 py-1 rounded text-black">Cancel</button>
-                          </div>
-                        </div>
-                      )}
-                      {showLogs[app.id] && (
-                        <pre className="mt-2 p-2 bg-black text-green-400 text-xs overflow-auto" style={{maxHeight: '200px'}} onClick={e => e.stopPropagation()}>{logs[app.id] || 'Loading...'}</pre>
-                      )}
-                    </div>
-                  ))}
                 </div>
               </Route>
             </Switch>
-          </div>
+          </main>
+          
+          {/* Footer */}
+          <footer className="bg-white/50 backdrop-blur-md border-t border-gray-200/50 mt-16">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="text-center text-gray-600">
+                <p className="text-sm">
+                  AI App Portal - Deploy and manage your AI applications with ease
+                </p>
+                <p className="text-xs mt-2 text-gray-400">
+                  Built with modern web technologies for optimal performance
+                </p>
+              </div>
+            </div>
+          </footer>
+        </div>
       );
     }
 
