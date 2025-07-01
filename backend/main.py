@@ -350,6 +350,31 @@ async def reset_password(
     new_password: str = Form(...),
     current_user: dict = Depends(get_current_user),
 ):
+=======
+@app.get("/users/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return {
+        "id": current_user["id"],
+        "username": current_user["username"],
+        "is_admin": current_user.get("is_admin", False),
+    }
+
+
+@app.get("/users")
+async def list_users(current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="admin only")
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id, username, is_admin FROM users")
+    users = [
+        {"id": row[0], "username": row[1], "is_admin": bool(row[2])}
+        for row in c.fetchall()
+    ]
+    conn.close()
+    return users
+
+
     if not current_user.get("is_admin"):
         raise HTTPException(status_code=403, detail="admin only")
     conn = sqlite3.connect(DATABASE)
