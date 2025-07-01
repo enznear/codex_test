@@ -559,6 +559,17 @@
           .catch(() => {});
       };
 
+      const resetPassword = (id) => {
+        const pwd = prompt('Enter new password');
+        if (!pwd) return;
+        apiFetch(`/users/${id}/reset_password`, {
+          method: 'POST',
+          body: new URLSearchParams({ new_password: pwd })
+        })
+          .then(() => alert('Password reset'))
+          .catch(() => alert('Error resetting password'));
+      };
+
       const startTemplateEdit = (t) => {
         setTEditId(t.id);
         setTEditName(t.name || '');
@@ -811,7 +822,7 @@
                         <h2 className="text-xl font-semibold text-gray-900">Quick Deploy Templates</h2>
                       </div>
                       
-                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
                         {templates.length === 0 ? (
                           <div className="text-center py-8 text-gray-500">
                             <p>No templates available yet.</p>
@@ -1083,11 +1094,17 @@
                           {users.map(u => (
                             <li key={u.id} className="flex justify-between items-center border rounded px-3 py-2">
                               <span>{u.username}{u.is_admin ? ' (admin)' : ''}</span>
-                              {!u.is_admin && (
-                                <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:underline">
-                                  Delete
+                              <div className="space-x-2">
+                                {!u.is_admin && (
+                                  <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:underline">
+                                    Delete
+                                  </button>
+                                )}
+                                <button onClick={() => resetPassword(u.id)} className="text-blue-600 hover:underline">
+                                  Reset Password
                                 </button>
-                              )}
+                              </div>
+
                             </li>
                           ))}
                         </ul>

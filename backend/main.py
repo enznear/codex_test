@@ -344,6 +344,13 @@ async def delete_user(user_id: int, current_user: dict = Depends(get_current_use
     return {"detail": "deleted"}
 
 
+@app.post("/users/{user_id}/reset_password")
+async def reset_password(
+    user_id: int,
+    new_password: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+):
+=======
 @app.get("/users/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return {
@@ -368,24 +375,21 @@ async def list_users(current_user: dict = Depends(get_current_user)):
     return users
 
 
-@app.delete("/users/{user_id}")
-async def delete_user(user_id: int, current_user: dict = Depends(get_current_user)):
     if not current_user.get("is_admin"):
         raise HTTPException(status_code=403, detail="admin only")
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT username FROM users WHERE id=?", (user_id,))
-    row = c.fetchone()
-    if not row:
+    c.execute("SELECT id FROM users WHERE id=?", (user_id,))
+    if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="user not found")
-    if row[0] == "admin":
-        conn.close()
-        raise HTTPException(status_code=400, detail="cannot delete admin user")
-    c.execute("DELETE FROM users WHERE id=?", (user_id,))
+    c.execute(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        (get_password_hash(new_password), user_id),
+    )
     conn.commit()
     conn.close()
-    return {"detail": "deleted"}
+    return {"detail": "password reset"}
 
 class StatusUpdate(BaseModel):
     app_id: str
