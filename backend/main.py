@@ -662,7 +662,7 @@ async def _stop_agent_and_update_status(app_id: str):
             await client.post(
                 f"{AGENT_URL}/stop",
                 json={"app_id": app_id},
-                timeout=5,
+                timeout=30,
             )
     except Exception as e:
         # Log this error or handle it more gracefully
