@@ -57,6 +57,7 @@ uvicorn backend.main:app --reload
    - **Gradio**: upload a single Python file or a zip archive containing your Gradio app. The backend will run the first `.py` file it finds in the uploaded directory.
    You can use `examples/gradio_app.py` as a starting point; it simply launches on the provided port. The proxy rewrites the path prefix so no extra `root_path` argument is needed.
    - **Docker**: include a `Dockerfile` in the uploaded directory or archive. If a `Dockerfile` is present the backend treats the app as a Docker project and builds it with `docker build`.
+   - **Docker compose**: include a `docker-compose.yml` file. The compose project will be started with `docker compose up` and should map the container port to `${PORT}` so the backend assigned port is used.
    - **Docker tar**: upload a tar archive created with `docker save`. The agent loads the image and runs it with GPU access using `docker run --gpus all`.
 
 2. **Send a request**
@@ -85,7 +86,7 @@ When launching Docker images manually, ensure GPU access is enabled. Install the
 CUDA. If you want to target a specific GPU, use `--gpus device=N`. Docker maps
 the chosen GPU to `CUDA_VISIBLE_DEVICES=0` inside the container.
 
-The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps should listen on the port indicated by this variable. The proxy now rewrites incoming requests so frameworks like Gradio no longer need a `root_path` argument. The agent still sets `ROOT_PATH` for compatibility, but it can be ignored.
+The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps and compose services should listen on the port indicated by this variable. The proxy now rewrites incoming requests so frameworks like Gradio no longer need a `root_path` argument. The agent still sets `ROOT_PATH` for compatibility, but it can be ignored.
 
 During upload the backend now verifies that the chosen port is free by briefly
 binding to it. If the port is busy another from the `AVAILABLE_PORTS` pool is
