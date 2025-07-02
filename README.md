@@ -55,7 +55,10 @@ uvicorn backend.main:app --reload
 
 1. **Prepare your files**
    - **Gradio**: upload a single Python file or a zip archive containing your Gradio app. The backend will run the first `.py` file it finds in the uploaded directory.
-   You can use `examples/gradio_app.py` as a starting point; it simply launches on the provided port. The proxy rewrites the path prefix so no extra `root_path` argument is needed.
+     If the archive contains a `requirements.txt` file it will be installed into
+     a fresh Python **3.10** virtual environment which is then used to run the
+     script.
+     You can use `examples/gradio_app.py` as a starting point; it simply launches on the provided port. The proxy rewrites the path prefix so no extra `root_path` argument is needed.
    - **Docker**: include a `Dockerfile` in the uploaded directory or archive. If a `Dockerfile` is present the backend treats the app as a Docker project and builds it with `docker build`.
    - **Docker compose**: include a `docker-compose.yml` file. The compose project will be started with `docker compose up` and should map the container port to `${PORT}` so the backend assigned port is used.
    - **Docker tar**: upload a tar archive created with `docker save`. The agent loads the image and runs it with GPU access using `docker run --gpus all`.
