@@ -462,7 +462,8 @@ async def build_and_run(req: RunRequest):
             return
 
         venv_dir = os.path.join(req.path, "venv")
-        ret = await async_run_wait(["python3.10", "-m", "venv", venv_dir], req.log_path)
+        python_exe = sys.executable
+        ret = await async_run_wait([python_exe, "-m", "venv", venv_dir], req.log_path)
         if ret != 0:
             try:
                 async with httpx.AsyncClient() as client:
@@ -477,8 +478,8 @@ async def build_and_run(req: RunRequest):
 
         req_file = os.path.join(req.path, "requirements.txt")
         if os.path.exists(req_file):
-            pip_path = os.path.join(venv_dir, "bin", "pip")
-            ret = await async_run_wait([pip_path, "install", "-r", req_file], req.log_path)
+            python_path = os.path.join(venv_dir, "bin", "python")
+            ret = await async_run_wait([python_path, "-m", "pip", "install", "-r", req_file], req.log_path)
             if ret != 0:
                 try:
                     async with httpx.AsyncClient() as client:
