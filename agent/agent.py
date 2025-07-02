@@ -460,7 +460,39 @@ async def build_and_run(req: RunRequest):
             finally:
                 remove_route(req.app_id)
             return
-        cmd = [sys.executable, os.path.join(req.path, target)]
+
+        venv_dir = os.path.join(req.path, "venv")
+        ret = await async_run_wait(["python3.10", "-m", "venv", venv_dir], req.log_path)
+        if ret != 0:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": req.app_id, "status": "error"},
+                        timeout=5,
+                    )
+            finally:
+                remove_route(req.app_id)
+            return
+
+        req_file = os.path.join(req.path, "requirements.txt")
+        if os.path.exists(req_file):
+            pip_path = os.path.join(venv_dir, "bin", "pip")
+            ret = await async_run_wait([pip_path, "install", "-r", req_file], req.log_path)
+            if ret != 0:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{BACKEND_URL}/update_status",
+                            json={"app_id": req.app_id, "status": "error"},
+                            timeout=5,
+                        )
+                finally:
+                    remove_route(req.app_id)
+                return
+
+        python_path = os.path.join(venv_dir, "bin", "python")
+        cmd = [python_path, os.path.join(req.path, target)]
         proc = await async_run_detached(
             cmd,
             req.log_path,
