@@ -8,7 +8,7 @@ import httpx
 import asyncio
 import socket
 from typing import List, Optional
-from proxy.proxy import add_route, remove_route
+from proxy.proxy import add_route, remove_route, load_routes
 import threading
 import time
 
@@ -19,6 +19,42 @@ app = FastAPI()
 # Track running processes mapping app_id -> {"proc": process, "type": "docker"/"docker_tar"/"gradio"}
 
 PROCESSES = {}
+
+
+@app.on_event("startup")
+async def recover_running_apps():
+    """Detect running apps and restart heartbeat loops."""
+    # Load existing proxy routes to discover app IDs
+    routes = load_routes()
+    # Query backend for app statuses to get GPU assignments if available
+    status_map = {}
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{BACKEND_URL}/status", timeout=5)
+            resp.raise_for_status()
+            for info in resp.json():
+                status_map[info.get("id")] = info
+    except Exception:
+        pass
+
+    for app_id in routes.keys():
+        # Skip if already tracked
+        if app_id in PROCESSES:
+            continue
+        is_docker = False
+        try:
+            out = subprocess.check_output(
+                ["docker", "inspect", "-f", "{{.State.Running}}", app_id],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+            is_docker = out == "true"
+        except Exception:
+            pass
+
+        gpu = status_map.get(app_id, {}).get("gpu")
+        PROCESSES[app_id] = {"proc": None, "type": "docker" if is_docker else "gradio", "gpu": gpu, "vram_required": 0}
+        asyncio.create_task(heartbeat_loop(app_id))
 
 def get_available_gpu(required: int = 0) -> Optional[int]:
 
@@ -397,11 +433,54 @@ async def wait_for_port(app_id: str, port: int, proc):
 
 async def heartbeat_loop(app_id: str):
     """Send periodic heartbeats and detect process exit."""
-    entry = PROCESSES.get(app_id)
-    proc = entry["proc"] if entry else None
-    while proc:
-        if proc.returncode is not None:
-            status = "finished" if proc.returncode == 0 else "error"
+    while True:
+        entry = PROCESSES.get(app_id)
+        if not entry:
+            break
+
+        proc = entry.get("proc")
+        app_type = entry.get("type")
+
+        running = True
+        status = "error"
+        if proc is not None:
+            if proc.returncode is not None:
+                running = False
+                status = "finished" if proc.returncode == 0 else "error"
+        else:
+            if app_type in ("docker", "docker_tar"):
+                try:
+                    out = subprocess.check_output(
+                        ["docker", "inspect", "-f", "{{.State.Running}}", app_id],
+                        text=True,
+                        stderr=subprocess.DEVNULL,
+                    ).strip()
+                    running = out == "true"
+                    if not running:
+                        exit_code = subprocess.check_output(
+                            ["docker", "inspect", "-f", "{{.State.ExitCode}}", app_id],
+                            text=True,
+                            stderr=subprocess.DEVNULL,
+                        ).strip()
+                        status = "finished" if exit_code == "0" else "error"
+                        subprocess.run(["docker", "rm", app_id], check=False)
+                except Exception:
+                    running = False
+                    status = "error"
+            else:
+                route = load_routes().get(app_id)
+                if route:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    try:
+                        s.settimeout(1)
+                        running = s.connect_ex(("127.0.0.1", route["port"])) == 0
+                    finally:
+                        s.close()
+                else:
+                    running = False
+                    status = "error"
+
+        if not running:
             try:
                 async with httpx.AsyncClient() as client:
                     await client.post(
@@ -411,10 +490,10 @@ async def heartbeat_loop(app_id: str):
                     )
             except Exception:
                 pass
-            # Clean up Nginx routing for this app
             remove_route(app_id)
             PROCESSES.pop(app_id, None)
             break
+
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(
@@ -424,9 +503,8 @@ async def heartbeat_loop(app_id: str):
                 )
         except Exception:
             pass
+
         await asyncio.sleep(5)
-        entry = PROCESSES.get(app_id)
-        proc = entry["proc"] if entry else None
 
 
 @app.post("/stop")
@@ -435,19 +513,20 @@ async def stop_app(req: StopRequest):
     entry = PROCESSES.get(req.app_id)
     if not entry:
         raise HTTPException(status_code=404, detail="app not running")
-    proc = entry["proc"]
+    proc = entry.get("proc")
     app_type = entry.get("type")
 
-    try:
-        proc.terminate()
+    if proc is not None:
         try:
-            await asyncio.wait_for(proc.wait(), 30)
-        except (asyncio.TimeoutError, subprocess.TimeoutExpired):
-            proc.kill()
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), 30)
+            except (asyncio.TimeoutError, subprocess.TimeoutExpired):
+                proc.kill()
+            except Exception:
+                proc.kill()
         except Exception:
-            proc.kill()
-    except Exception:
-        pass
+            pass
 
     PROCESSES.pop(req.app_id, None)
 
