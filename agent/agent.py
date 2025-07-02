@@ -9,8 +9,6 @@ import asyncio
 import socket
 from typing import List, Optional
 from proxy.proxy import add_route, remove_route, load_routes
-import threading
-import time
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
