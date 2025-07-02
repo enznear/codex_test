@@ -115,7 +115,8 @@
       border: 2px dashed #a5b4fc;
       transition: all 0.3s ease;
     }
-    .upload-area:hover {
+    .upload-area:hover,
+    .upload-area.drag-active {
       border-color: #667eea;
       background-color: rgba(102, 126, 234, 0.05);
     }
@@ -283,6 +284,7 @@
       const [runType, setRunType] = useState('gradio');
       const [vramRequired, setVramRequired] = useState('0');
       const [files, setFiles] = useState([]);
+      const [dragActive, setDragActive] = useState(false);
       const [apps, setApps] = useState([]);
       const [users, setUsers] = useState([]);
       const [logs, setLogs] = useState({});
@@ -426,6 +428,28 @@
             .catch(() => {});
         }
       }, [isAdmin]);
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!dragActive) setDragActive(true);
+      };
+
+      const handleDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          setFiles(e.dataTransfer.files);
+          e.dataTransfer.clearData();
+        }
+      };
 
       const handleUpload = (e) => {
         e.preventDefault();
@@ -753,7 +777,13 @@
                         
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">Upload Files</label>
-                          <div className="upload-area border-2 border-dashed border-indigo-300 rounded-lg p-6 text-center">
+                          <div
+                            className={`upload-area border-2 border-dashed border-indigo-300 rounded-lg p-6 text-center ${dragActive ? 'drag-active' : ''}`}
+                            onDragOver={handleDragOver}
+                            onDragEnter={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                          >
                             <input 
                               type="file" 
                               className="hidden" 
