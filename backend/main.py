@@ -1205,6 +1205,7 @@ async def delete_app(app_id: str):
 
     app_path = os.path.join(UPLOAD_DIR, app_id)
     force_rmtree(app_path)
+
     log_file = os.path.join(LOG_DIR, f"{app_id}.log")
     if os.path.exists(log_file):
         os.remove(log_file)
