@@ -92,6 +92,11 @@ binding to it. If the port is busy another from the `AVAILABLE_PORTS` pool is
 tried. The agent performs the same check before launching an app, failing the
 run if the port cannot be bound.
 
+On startup the agent now checks existing proxy routes and any running Docker
+containers. This allows it to restore heartbeat loops for previously deployed
+apps. Recovered apps are marked as running again so their status shows up
+correctly in the backend.
+
 
 Example setup:
 
