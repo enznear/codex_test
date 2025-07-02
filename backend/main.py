@@ -16,6 +16,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 import shutil
 import os
+import subprocess
+import stat
 import uuid
 import zipfile
 import sqlite3
@@ -39,6 +41,20 @@ PORT_START = int(os.environ.get("PORT_START", 9000))
 PORT_END = int(os.environ.get("PORT_END", 9100))
 AVAILABLE_PORTS = set(range(PORT_START, PORT_END))
 app = FastAPI()
+
+
+def force_rmtree(path: str):
+    """Remove a directory tree, adjusting permissions if needed."""
+    def _onerror(func, p, exc_info):
+        try:
+            os.chmod(p, stat.S_IWRITE)
+            func(p)
+        except Exception:
+            pass
+
+    shutil.rmtree(path, ignore_errors=True, onerror=_onerror)
+    if os.path.exists(path) and os.name != "nt":
+        subprocess.run(["rm", "-rf", path], check=False)
 
 # Authentication setup
 SECRET_KEY = os.environ.get("SECRET_KEY", "change_me")
@@ -746,7 +762,7 @@ async def delete_template(template_id: str):
     conn.commit()
     conn.close()
 
-    shutil.rmtree(os.path.join(TEMPLATE_DIR, template_id), ignore_errors=True)
+    force_rmtree(os.path.join(TEMPLATE_DIR, template_id))
 
     return {"detail": "deleted"}
 
@@ -1107,7 +1123,7 @@ async def save_template_from_app(app_id: str):
     if app_type == "docker_tar":
         files = [f for f in os.listdir(dst_dir) if f.endswith(".tar")]
         if not files:
-            shutil.rmtree(dst_dir, ignore_errors=True)
+            force_rmtree(dst_dir)
             raise HTTPException(status_code=500, detail="tar file missing")
         stored_path = files[0]
     else:
@@ -1187,7 +1203,8 @@ async def delete_app(app_id: str):
     conn.commit()
     conn.close()
 
-    shutil.rmtree(os.path.join(UPLOAD_DIR, app_id), ignore_errors=True)
+    app_path = os.path.join(UPLOAD_DIR, app_id)
+    force_rmtree(app_path)
     log_file = os.path.join(LOG_DIR, f"{app_id}.log")
     if os.path.exists(log_file):
         os.remove(log_file)
