@@ -301,6 +301,7 @@
       const [tEditVram, setTEditVram] = useState('0');
       const [openMenus, setOpenMenus] = useState({});
       const [isAdmin, setIsAdmin] = useState(false);
+      const [currentUser, setCurrentUser] = useState('');
       const [mode, setMode] = useState('login');
       // Close any open kebab menus when clicking outside
       useEffect(() => {
@@ -322,6 +323,7 @@
               if (data.access_token) {
                 localStorage.setItem('token', data.access_token);
                 setToken(data.access_token);
+                setCurrentUser(data.username || '');
                 if (data.is_admin) setIsAdmin(true);
 
                 // Reload to ensure the main UI renders immediately
@@ -390,7 +392,12 @@
           .catch(() => {});
         apiFetch('/users/me')
           .then(res => res.ok ? res.json() : null)
-          .then(data => { if (data) { setIsAdmin(data.is_admin); } })
+          .then(data => {
+            if (data) {
+              setIsAdmin(data.is_admin);
+              setCurrentUser(data.username);
+            }
+          })
           .catch(() => {});
       }, [token]);
 
@@ -697,10 +704,17 @@
                       Users
                     </Link>
                   )}
+                  {currentUser && (
+                    <span className="px-4 py-2 text-sm text-gray-600">
+                      Logged in as {currentUser}
+                    </span>
+                  )}
                   <button
                     onClick={() => {
                       localStorage.removeItem('token');
                       setToken('');
+                      setCurrentUser('');
+                      setIsAdmin(false);
                       window.location.href = '/';
                     }}
                     className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900"
