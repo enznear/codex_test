@@ -35,24 +35,55 @@ async def recover_running_apps():
     except Exception:
         pass
 
-    for app_id in routes.keys():
+    for app_id, info in routes.items():
         # Skip if already tracked
         if app_id in PROCESSES:
             continue
+
         is_docker = False
+        container_running = False
         try:
             out = subprocess.check_output(
                 ["docker", "inspect", "-f", "{{.State.Running}}", app_id],
                 text=True,
                 stderr=subprocess.DEVNULL,
             ).strip()
-            is_docker = out == "true"
+            is_docker = True
+            container_running = out == "true"
         except Exception:
             pass
 
-        gpu = status_map.get(app_id, {}).get("gpu")
-        PROCESSES[app_id] = {"proc": None, "type": "docker" if is_docker else "gradio", "gpu": gpu, "vram_required": 0}
-        asyncio.create_task(heartbeat_loop(app_id))
+        port_running = False
+        port = info.get("port")
+        if port:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                s.settimeout(1)
+                port_running = s.connect_ex(("127.0.0.1", port)) == 0
+            finally:
+                s.close()
+
+        if container_running or port_running:
+            gpu = status_map.get(app_id, {}).get("gpu")
+            PROCESSES[app_id] = {
+                "proc": None,
+                "type": "docker" if is_docker else "gradio",
+                "gpu": gpu,
+                "vram_required": 0,
+            }
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": app_id, "status": "running", "gpu": gpu},
+                        timeout=5,
+                    )
+            except Exception:
+                pass
+            asyncio.create_task(heartbeat_loop(app_id))
+        else:
+            # Stale route with no running process
+            remove_route(app_id)
 
 def get_available_gpu(required: int = 0) -> Optional[int]:
 
