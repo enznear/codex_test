@@ -14,7 +14,7 @@ BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 
 app = FastAPI()
 
-# Track running processes mapping app_id -> {"proc": process, "type": "docker"/"docker_tar"/"gradio"}
+# Track running processes mapping app_id -> {"proc": process, "type": "docker"/"docker_tar"/"docker_compose"/"gradio"}
 
 PROCESSES = {}
 
@@ -340,6 +340,45 @@ async def build_and_run(req: RunRequest):
 
             },
         )
+    elif req.type == "docker_compose":
+        compose_file = os.path.join(req.path, "docker-compose.yml")
+        if not os.path.exists(compose_file):
+            compose_file = os.path.join(req.path, "docker-compose.yaml")
+        if not os.path.exists(compose_file):
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": req.app_id, "status": "error"},
+                        timeout=5,
+                    )
+            finally:
+                remove_route(req.app_id)
+            return
+        cmd = [
+            "docker",
+            "compose",
+            "-f",
+            compose_file,
+            "-p",
+            req.app_id,
+            "up",
+            "--build",
+            "-d",
+        ]
+        ret = await async_run_wait(cmd, req.log_path, env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"})
+        if ret != 0:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": req.app_id, "status": "error"},
+                        timeout=5,
+                    )
+            finally:
+                remove_route(req.app_id)
+            return
+        proc = None
     elif req.type == "docker_tar":
         run_image = req.app_id
         if not req.reuse_image:
@@ -436,12 +475,36 @@ async def build_and_run(req: RunRequest):
     # differently for docker vs gradio apps
     PROCESSES[req.app_id] = {"proc": proc, "type": req.type, "gpu": gpu, "vram_required": req.vram_required}
     asyncio.create_task(heartbeat_loop(req.app_id))
-    asyncio.create_task(wait_for_http_ready(req.app_id, req.port, proc))
+    if req.type == "docker_compose":
+        asyncio.create_task(wait_for_compose_ready(req.app_id, req.port))
+    else:
+        asyncio.create_task(wait_for_http_ready(req.app_id, req.port, proc))
 
 
 async def wait_for_port(app_id: str, port: int, proc):
     """Wait until the given port accepts connections then mark running."""
     while proc.returncode is None:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.settimeout(1)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(
+                            f"{BACKEND_URL}/update_status",
+                            json={"app_id": app_id, "status": "running"},
+                            timeout=5,
+                        )
+                except Exception:
+                    pass
+                return
+        finally:
+            s.close()
+        await asyncio.sleep(1)
+
+async def wait_for_compose_ready(app_id: str, port: int):
+    """Wait for compose service port to open and mark running."""
+    while True:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             s.settimeout(1)
@@ -493,6 +556,28 @@ async def heartbeat_loop(app_id: str):
                         ).strip()
                         status = "finished" if exit_code == "0" else "error"
                         subprocess.run(["docker", "rm", app_id], check=False)
+                except Exception:
+                    running = False
+                    status = "error"
+            elif app_type == "docker_compose":
+                try:
+                    ids = subprocess.check_output(
+                        ["docker", "compose", "-p", app_id, "ps", "-q"],
+                        text=True,
+                        stderr=subprocess.DEVNULL,
+                    ).strip().splitlines()
+                    running = False
+                    for cid in ids:
+                        state = subprocess.check_output(
+                            ["docker", "inspect", "-f", "{{.State.Running}}", cid],
+                            text=True,
+                            stderr=subprocess.DEVNULL,
+                        ).strip()
+                        if state == "true":
+                            running = True
+                            break
+                    if not running:
+                        status = "finished"
                 except Exception:
                     running = False
                     status = "error"
@@ -562,6 +647,8 @@ async def stop_app(req: StopRequest):
     # Best effort stop docker container for docker-based apps
     if app_type in ("docker", "docker_tar"):
         subprocess.run(["docker", "stop", req.app_id], check=False)
+    elif app_type == "docker_compose":
+        subprocess.run(["docker", "compose", "-p", req.app_id, "down"], check=False)
 
     # Remove proxy route and notify backend
     remove_route(req.app_id)

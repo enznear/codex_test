@@ -225,11 +225,16 @@ def ensure_templates():
         stored_path = "."
         for root, _, files in os.walk(full):
             for fname in files:
-                if fname.lower().endswith(".tar"):
+                lower = fname.lower()
+                if lower.endswith(".tar"):
                     app_type = "docker_tar"
                     stored_path = fname
                     break
-                if fname.lower() == "dockerfile":
+                if lower in ("docker-compose.yml", "docker-compose.yaml"):
+                    app_type = "docker_compose"
+                    stored_path = os.path.relpath(os.path.join(root, fname), full)
+                    break
+                if lower == "dockerfile":
                     app_type = "docker"
                     break
             if app_type != "gradio":
@@ -547,16 +552,22 @@ async def upload_app(
             z.extractall(app_dir)
 
     # Detect app type
+    compose_file = None
     if filename.lower().endswith(".tar"):
         app_type = "docker_tar"
     else:
         app_type = "gradio"
         for root, _, files in os.walk(app_dir):
             for fname in files:
-                if fname.lower() == "dockerfile":
+                lower = fname.lower()
+                if lower in ("docker-compose.yml", "docker-compose.yaml"):
+                    app_type = "docker_compose"
+                    compose_file = os.path.join(root, fname)
+                    break
+                if lower == "dockerfile":
                     app_type = "docker"
                     break
-            if app_type == "docker":
+            if app_type in ("docker", "docker_compose"):
                 break
 
     log_path = os.path.join(LOG_DIR, f"{app_id}.log")
@@ -589,7 +600,12 @@ async def upload_app(
 
 
     # Path sent to the agent depends on app type
-    run_path = file_location if app_type == "docker_tar" else app_dir
+    if app_type == "docker_tar":
+        run_path = file_location
+    elif app_type == "docker_compose":
+        run_path = os.path.dirname(compose_file) if compose_file else app_dir
+    else:
+        run_path = app_dir
 
     # Request agent to run
     try:
@@ -702,10 +718,15 @@ async def upload_template(
         stored_path = "."
         for root, _, files in os.walk(t_dir):
             for fname in files:
-                if fname.lower() == "dockerfile":
+                lower = fname.lower()
+                if lower in ("docker-compose.yml", "docker-compose.yaml"):
+                    app_type = "docker_compose"
+                    stored_path = os.path.relpath(os.path.join(root, fname), t_dir)
+                    break
+                if lower == "dockerfile":
                     app_type = "docker"
                     break
-            if app_type == "docker":
+            if app_type != "gradio":
                 break
 
     conn = sqlite3.connect(DATABASE)
@@ -809,7 +830,10 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
         description=description.strip() if description else None,
     )
 
-    run_path = os.path.join(app_dir, stored_path) if stored_path and stored_path != "." else app_dir
+    if app_type == "docker_compose" and stored_path and stored_path != ".":
+        run_path = os.path.join(app_dir, os.path.dirname(stored_path))
+    else:
+        run_path = os.path.join(app_dir, stored_path) if stored_path and stored_path != "." else app_dir
 
     try:
         async with httpx.AsyncClient() as client:
@@ -994,6 +1018,18 @@ async def restart_app(app_id: str):
         if not files:
             raise HTTPException(status_code=500, detail="tar file missing")
         run_path = os.path.join(app_dir, files[0])
+    elif app_type == "docker_compose":
+        compose = None
+        for root, _, files in os.walk(app_dir):
+            for fname in files:
+                if fname.lower() in ("docker-compose.yml", "docker-compose.yaml"):
+                    compose = os.path.join(root, fname)
+                    break
+            if compose:
+                break
+        if not compose:
+            raise HTTPException(status_code=500, detail="compose file missing")
+        run_path = os.path.dirname(compose)
     else:
         run_path = app_dir
 
@@ -1086,10 +1122,15 @@ async def save_template_from_app(app_id: str):
         stored_path = "."
         for root, _, files in os.walk(dst_dir):
             for fname in files:
-                if fname.lower() == "dockerfile":
+                lower = fname.lower()
+                if lower in ("docker-compose.yml", "docker-compose.yaml"):
+                    app_type = "docker_compose"
+                    stored_path = os.path.relpath(os.path.join(root, fname), dst_dir)
+                    break
+                if lower == "dockerfile":
                     app_type = "docker"
                     break
-            if app_type == "docker":
+            if app_type != "gradio":
                 break
 
     conn = sqlite3.connect(DATABASE)
