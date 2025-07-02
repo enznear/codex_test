@@ -1,4 +1,5 @@
 """FastAPI backend for MLOps app deployment."""
+
 from fastapi import (
     FastAPI,
     UploadFile,
@@ -51,10 +52,12 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 # Serve the React frontend from the same origin
 app.mount("/static", StaticFiles(directory="frontend"), name="frontend")
 
+
 @app.get("/", include_in_schema=False)
 async def frontend_index():
     """Return the frontend single-page app."""
     return FileResponse("frontend/index.html")
+
 
 # Allowed pattern for uploaded filenames
 ALLOWED_FILENAME = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -68,9 +71,7 @@ def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
 
-def create_access_token(
-    data: dict, expires_delta: timedelta | None = None
-) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -82,11 +83,19 @@ def create_access_token(
 def get_user(username: str):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, username, password_hash, is_admin FROM users WHERE username=?", (username,))
+    c.execute(
+        "SELECT id, username, password_hash, is_admin FROM users WHERE username=?",
+        (username,),
+    )
     row = c.fetchone()
     conn.close()
     if row:
-        return {"id": row[0], "username": row[1], "password_hash": row[2], "is_admin": bool(row[3])}
+        return {
+            "id": row[0],
+            "username": row[1],
+            "password_hash": row[2],
+            "is_admin": bool(row[3]),
+        }
     return None
 
 
@@ -116,6 +125,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     if user is None:
         raise credentials_exception
     return user
+
 
 def init_db():
     conn = sqlite3.connect(DATABASE)
@@ -209,7 +219,9 @@ def init_db():
         conn.commit()
     conn.close()
 
+
 init_db()
+
 
 def ensure_templates():
     """Scan TEMPLATE_DIR for folders and register them as templates."""
@@ -241,7 +253,9 @@ def ensure_templates():
     conn.commit()
     conn.close()
 
+
 ensure_templates()
+
 
 def release_app_port(app_id: str):
     """Return the port used by the app back to the pool."""
@@ -254,6 +268,7 @@ def release_app_port(app_id: str):
         c.execute("UPDATE apps SET port=NULL WHERE id=?", (app_id,))
         conn.commit()
     conn.close()
+
 
 def is_port_free(port: int) -> bool:
     """Check if a TCP port is available."""
@@ -366,56 +381,20 @@ async def reset_password(
     conn.close()
     return {"detail": "password reset"}
 
-@app.get("/users/me")
-async def get_me(current_user: dict = Depends(get_current_user)):
-    return {
-        "id": current_user["id"],
-        "username": current_user["username"],
-        "is_admin": current_user.get("is_admin", False),
-    }
-
-
-@app.get("/users")
-async def list_users(current_user: dict = Depends(get_current_user)):
-    if not current_user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="admin only")
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT id, username, is_admin FROM users")
-    users = [
-        {"id": row[0], "username": row[1], "is_admin": bool(row[2])}
-        for row in c.fetchall()
-    ]
-    conn.close()
-    return users
-
-
-    if not current_user.get("is_admin"):
-        raise HTTPException(status_code=403, detail="admin only")
-    conn = sqlite3.connect(DATABASE)
-    c = conn.cursor()
-    c.execute("SELECT id FROM users WHERE id=?", (user_id,))
-    if not c.fetchone():
-        conn.close()
-        raise HTTPException(status_code=404, detail="user not found")
-    c.execute(
-        "UPDATE users SET password_hash=? WHERE id=?",
-        (get_password_hash(new_password), user_id),
-    )
-    conn.commit()
-    conn.close()
-    return {"detail": "password reset"}
 
 class StatusUpdate(BaseModel):
     app_id: str
     status: str
     gpu: int | None = None
 
+
 class Heartbeat(BaseModel):
     app_id: str
 
+
 class StopRequest(BaseModel):
     app_id: str
+
 
 def save_status(
     app_id: str,
@@ -497,10 +476,10 @@ def save_status(
                 gpu,
                 vram_required,
             ),
-
         )
     conn.commit()
     conn.close()
+
 
 @app.post("/upload")
 async def upload_app(
@@ -512,9 +491,8 @@ async def upload_app(
     vram_required: int = Form(0),
     current_user: dict = Depends(get_current_user),
 ):
-
     """Receive user uploaded app and trigger agent build/run."""
-    allowed = [ip.strip() for ip in allow_ips.split(',')] if allow_ips else None
+    allowed = [ip.strip() for ip in allow_ips.split(",")] if allow_ips else None
     allowed_str = ",".join(allowed) if allowed else None
     # Reject duplicate app names
     conn = sqlite3.connect(DATABASE)
@@ -540,10 +518,14 @@ async def upload_app(
             for member in z.namelist():
                 # Reject absolute paths or traversals
                 if os.path.isabs(member) or ".." in member.split("/"):
-                    raise HTTPException(status_code=400, detail="invalid zip entry path")
+                    raise HTTPException(
+                        status_code=400, detail="invalid zip entry path"
+                    )
                 resolved = os.path.realpath(os.path.join(app_dir, member))
                 if not resolved.startswith(os.path.realpath(app_dir) + os.sep):
-                    raise HTTPException(status_code=400, detail="zip entry outside app directory")
+                    raise HTTPException(
+                        status_code=400, detail="zip entry outside app directory"
+                    )
             z.extractall(app_dir)
 
     # Detect app type
@@ -586,7 +568,6 @@ async def upload_app(
         auth_header=auth_header,
         vram_required=vram_required,
     )
-
 
     # Path sent to the agent depends on app type
     run_path = file_location if app_type == "docker_tar" else app_dir
@@ -688,10 +669,14 @@ async def upload_template(
         with zipfile.ZipFile(file_location, "r") as z:
             for member in z.namelist():
                 if os.path.isabs(member) or ".." in member.split("/"):
-                    raise HTTPException(status_code=400, detail="invalid zip entry path")
+                    raise HTTPException(
+                        status_code=400, detail="invalid zip entry path"
+                    )
                 resolved = os.path.realpath(os.path.join(t_dir, member))
                 if not resolved.startswith(os.path.realpath(t_dir) + os.sep):
-                    raise HTTPException(status_code=400, detail="zip entry outside template directory")
+                    raise HTTPException(
+                        status_code=400, detail="zip entry outside template directory"
+                    )
             z.extractall(t_dir)
 
     if filename.lower().endswith(".tar"):
@@ -809,7 +794,11 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
         description=description.strip() if description else None,
     )
 
-    run_path = os.path.join(app_dir, stored_path) if stored_path and stored_path != "." else app_dir
+    run_path = (
+        os.path.join(app_dir, stored_path)
+        if stored_path and stored_path != "."
+        else app_dir
+    )
 
     try:
         async with httpx.AsyncClient() as client:
@@ -846,7 +835,10 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
             vram_required=vram_required,
             description=description.strip() if description else None,
         )
-        raise HTTPException(status_code=502, detail="Unable to reach agent. Please ensure the agent is running and reachable.")
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to reach agent. Please ensure the agent is running and reachable.",
+        )
     except httpx.TimeoutException:
         AVAILABLE_PORTS.add(port)
         save_status(
@@ -857,7 +849,10 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
             vram_required=vram_required,
             description=description.strip() if description else None,
         )
-        raise HTTPException(status_code=504, detail="Agent request timed out. Please make sure the agent is running.")
+        raise HTTPException(
+            status_code=504,
+            detail="Agent request timed out. Please make sure the agent is running.",
+        )
     except Exception as e:
         AVAILABLE_PORTS.add(port)
         save_status(
@@ -871,6 +866,7 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"app_id": app_id, "url": url}
+
 
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
@@ -918,12 +914,13 @@ async def _stop_agent_and_update_status(app_id: str):
         # Log this error or handle it more gracefully
         # For now, we'll proceed to update status to avoid app being stuck in "stopping"
         print(f"Error stopping agent for {app_id}: {e}")
-        save_status(app_id, "error", gpu=None) # Or a more specific error status
+        save_status(app_id, "error", gpu=None)  # Or a more specific error status
         release_app_port(app_id)
         return
 
     save_status(app_id, "stopped", gpu=None)
     release_app_port(app_id)
+
 
 @app.get("/status")
 async def get_status():
@@ -943,6 +940,7 @@ async def get_status():
         }
         for row in rows
     ]
+
 
 @app.get("/logs/{app_id}", response_class=PlainTextResponse)
 async def get_logs(app_id: str):
@@ -986,7 +984,7 @@ async def restart_app(app_id: str):
     app_type, log_path, stored_port, allow_ips_str, auth_header, vram_required = row
     conn.close()
 
-    allowed = [ip.strip() for ip in allow_ips_str.split(',')] if allow_ips_str else None
+    allowed = [ip.strip() for ip in allow_ips_str.split(",")] if allow_ips_str else None
 
     app_dir = os.path.join(UPLOAD_DIR, app_id)
     if app_type == "docker_tar":
@@ -1061,7 +1059,6 @@ async def save_template_from_app(app_id: str):
     c = conn.cursor()
     c.execute(
         "SELECT name, description, type, vram_required FROM apps WHERE id=?",
-
         (app_id,),
     )
     row = c.fetchone()
@@ -1069,7 +1066,6 @@ async def save_template_from_app(app_id: str):
     if not row:
         raise HTTPException(status_code=404, detail="app not found")
     name, description, app_type, vram_required = row
-
 
     template_id = str(uuid.uuid4())
     src_dir = os.path.join(UPLOAD_DIR, app_id)
@@ -1096,8 +1092,14 @@ async def save_template_from_app(app_id: str):
     c = conn.cursor()
     c.execute(
         "INSERT INTO templates(id, name, type, path, description, vram_required) VALUES(?,?,?,?,?,?)",
-        (template_id, name, app_type, stored_path, description or "", vram_required or 0),
-
+        (
+            template_id,
+            name,
+            app_type,
+            stored_path,
+            description or "",
+            vram_required or 0,
+        ),
     )
     conn.commit()
     conn.close()
@@ -1161,6 +1163,7 @@ class EditApp(BaseModel):
     name: str
     description: str = ""
 
+
 class EditTemplate(BaseModel):
     template_id: str
     name: str
@@ -1177,12 +1180,16 @@ async def edit_app(info: EditApp, current_user: dict = Depends(get_current_user)
     if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="app not found")
-    c.execute("SELECT id FROM apps WHERE name=? AND id!=?", (info.name.strip(), info.app_id))
+    c.execute(
+        "SELECT id FROM apps WHERE name=? AND id!=?", (info.name.strip(), info.app_id)
+    )
     if c.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="app name already exists")
     conn.close()
-    save_status(info.app_id, name=info.name.strip(), description=info.description.strip())
+    save_status(
+        info.app_id, name=info.name.strip(), description=info.description.strip()
+    )
     return {"detail": "updated"}
 
 
@@ -1214,6 +1221,7 @@ async def edit_template(info: EditTemplate):
     conn.commit()
     conn.close()
     return {"detail": "updated"}
+
 
 async def cleanup_task():
     """Periodically check for apps without heartbeat and mark them as error."""
@@ -1261,9 +1269,7 @@ async def startup_event():
     # Remove ports for any apps that are already running
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute(
-        "SELECT port FROM apps WHERE status='running' AND port IS NOT NULL"
-    )
+    c.execute("SELECT port FROM apps WHERE status='running' AND port IS NOT NULL")
     rows = c.fetchall()
     conn.close()
     for row in rows:
