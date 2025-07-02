@@ -16,6 +16,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 import shutil
 import os
+import subprocess
 import uuid
 import zipfile
 import sqlite3
@@ -1187,7 +1188,10 @@ async def delete_app(app_id: str):
     conn.commit()
     conn.close()
 
-    shutil.rmtree(os.path.join(UPLOAD_DIR, app_id), ignore_errors=True)
+    app_path = os.path.join(UPLOAD_DIR, app_id)
+    shutil.rmtree(app_path, ignore_errors=True)
+    if os.path.exists(app_path):
+        subprocess.run(["rm", "-rf", app_path], check=False)
     log_file = os.path.join(LOG_DIR, f"{app_id}.log")
     if os.path.exists(log_file):
         os.remove(log_file)
