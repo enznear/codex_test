@@ -254,6 +254,8 @@
             return { class: 'status-starting pulse', text: 'Starting', bg: 'bg-blue-100', text_color: 'text-blue-800' };
           case 'building':
             return { class: 'status-starting pulse', text: 'Building', bg: 'bg-blue-100', text_color: 'text-blue-800' };
+          case 'deploying':
+            return { class: 'status-starting pulse', text: 'Deploying', bg: 'bg-blue-100', text_color: 'text-blue-800' };
           default:
             return { class: 'status-stopped', text: 'Unknown', bg: 'bg-gray-100', text_color: 'text-gray-800' };
         }
@@ -309,6 +311,8 @@
       const [isAdmin, setIsAdmin] = useState(false);
       const [currentUser, setCurrentUser] = useState('');
       const [mode, setMode] = useState('login');
+      const [deployingApps, setDeployingApps] = useState([]);
+      const [deployingTemplates, setDeployingTemplates] = useState({});
       // Close any open kebab menus when clicking outside
       useEffect(() => {
         const handleClickOutside = () => setOpenMenus({});
@@ -416,7 +420,15 @@
       const refreshStatus = async () => {
         const res = await apiFetch('/status');
         const data = await res.json();
-        setApps(data);
+        const existingIds = new Set(data.map(a => a.id));
+        const remainingDeploying = deployingApps.filter(d => !existingIds.has(d.id));
+        setDeployingApps(remainingDeploying);
+        const newDeployingTemplates = { ...deployingTemplates };
+        Object.entries(deployingTemplates).forEach(([tid, aid]) => {
+          if (existingIds.has(aid)) delete newDeployingTemplates[tid];
+        });
+        setDeployingTemplates(newDeployingTemplates);
+        setApps([...remainingDeploying, ...data]);
       };
 
       const pollStatus = (appId) => {
@@ -569,7 +581,20 @@
 
       const deployTemplate = async (id) => {
         try {
-          await apiFetch(`/deploy_template/${id}`, { method: 'POST' });
+          const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST' });
+          const data = await res.json();
+          const t = templates.find(tmp => tmp.id === id) || {};
+          const placeholder = {
+            id: data.app_id,
+            name: t.name || id,
+            description: t.description || '',
+            status: 'deploying',
+            url: data.url,
+            gpu: null
+          };
+          setDeployingApps(prev => [...prev, placeholder]);
+          setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
+          setApps(prev => [placeholder, ...prev]);
           refreshStatus();
         } catch {}
       };
@@ -951,11 +976,12 @@
                                     </div>
                                   </div>
                                   <div className="flex space-x-2">
-                                    <button 
-                                      onClick={() => deployTemplate(t.id)} 
+                                    <button
+                                      onClick={() => deployTemplate(t.id)}
                                       className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium flex-1"
+                                      disabled={deployingTemplates[t.id]}
                                     >
-                                      Deploy
+                                      {deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}
                                     </button>
                                     <button 
                                       onClick={() => startTemplateEdit(t)} 
