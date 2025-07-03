@@ -19,6 +19,30 @@ app = FastAPI()
 PROCESSES = {}
 
 
+async def _cleanup_deleted_app(app_id: str):
+    """Terminate running process and remove proxy route if backend deleted the app."""
+    entry = PROCESSES.pop(app_id, None)
+    if entry:
+        proc = entry.get("proc")
+        app_type = entry.get("type")
+        if proc is not None:
+            try:
+                proc.terminate()
+                try:
+                    await asyncio.wait_for(proc.wait(), 30)
+                except (asyncio.TimeoutError, subprocess.TimeoutExpired):
+                    proc.kill()
+                except Exception:
+                    proc.kill()
+            except Exception:
+                pass
+        if app_type in ("docker", "docker_tar"):
+            subprocess.run(["docker", "stop", app_id], check=False)
+        elif app_type == "docker_compose":
+            subprocess.run(["docker", "compose", "-p", app_id, "down"], check=False)
+    remove_route(app_id)
+
+
 @app.on_event("startup")
 async def recover_running_apps():
     """Detect running apps and restart heartbeat loops."""
@@ -263,11 +287,14 @@ async def wait_for_http_ready(app_id: str, port: int, proc):
                 await client.get(url, timeout=1)
                 entry = PROCESSES.get(app_id)
                 gpu = entry.get("gpu") if entry else None
-                await client.post(
+                resp = await client.post(
                     f"{BACKEND_URL}/update_status",
                     json={"app_id": app_id, "status": "running", "gpu": gpu},
                     timeout=5,
                 )
+                if resp.status_code == 404:
+                    await _cleanup_deleted_app(app_id)
+                    return
                 return
         except Exception:
             await asyncio.sleep(1)
@@ -558,11 +585,14 @@ async def wait_for_compose_ready(app_id: str, port: int):
             if s.connect_ex(("127.0.0.1", port)) == 0:
                 try:
                     async with httpx.AsyncClient() as client:
-                        await client.post(
+                        resp = await client.post(
                             f"{BACKEND_URL}/update_status",
                             json={"app_id": app_id, "status": "running"},
                             timeout=5,
                         )
+                        if resp.status_code == 404:
+                            await _cleanup_deleted_app(app_id)
+                            return
                 except Exception:
                     pass
                 return
@@ -644,11 +674,14 @@ async def heartbeat_loop(app_id: str):
         if not running:
             try:
                 async with httpx.AsyncClient() as client:
-                    await client.post(
+                    resp = await client.post(
                         f"{BACKEND_URL}/update_status",
                         json={"app_id": app_id, "status": status, "gpu": None},
                         timeout=5,
                     )
+                    if resp.status_code == 404:
+                        await _cleanup_deleted_app(app_id)
+                        break
             except Exception:
                 pass
             remove_route(app_id)
@@ -657,11 +690,14 @@ async def heartbeat_loop(app_id: str):
 
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(
+                resp = await client.post(
                     f"{BACKEND_URL}/heartbeat",
                     json={"app_id": app_id},
                     timeout=5,
                 )
+                if resp.status_code == 404:
+                    await _cleanup_deleted_app(app_id)
+                    break
         except Exception:
             pass
 
