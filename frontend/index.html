@@ -149,13 +149,19 @@
     
     const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
 
-    const apiFetch = (url, options = {}) => {
+    const apiFetch = async (url, options = {}) => {
       const token = localStorage.getItem('token');
       options.headers = options.headers || {};
       if (token) {
         options.headers['Authorization'] = 'Bearer ' + token;
       }
-      return fetch(url, options);
+      const response = await fetch(url, options);
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        window.location.href = '/';
+        throw new Error('Unauthorized');
+      }
+      return response;
     };
 
     // 커스텀 드롭다운 컴포넌트
@@ -311,45 +317,47 @@
       }, []);
 
       if (!token) {
-        const handleLogin = (e) => {
+        const handleLogin = async (e) => {
           e.preventDefault();
-          apiFetch('/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ username, password })
-          })
-            .then(res => res.json())
-            .then(data => {
-              if (data.access_token) {
-                localStorage.setItem('token', data.access_token);
-                setToken(data.access_token);
-                setCurrentUser(data.username || '');
-                if (data.is_admin) setIsAdmin(true);
+          try {
+            const res = await apiFetch('/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ username, password })
+            });
+            const data = await res.json();
+            if (data.access_token) {
+              localStorage.setItem('token', data.access_token);
+              setToken(data.access_token);
+              setCurrentUser(data.username || '');
+              if (data.is_admin) setIsAdmin(true);
 
-                // Reload to ensure the main UI renders immediately
-                window.location.href = '/';
-              } else {
-                alert('Login failed');
-              }
-            })
-            .catch(() => alert('Login failed'));
+              // Reload to ensure the main UI renders immediately
+              window.location.href = '/';
+            } else {
+              alert('Login failed');
+            }
+          } catch (err) {
+            alert('Login failed');
+          }
         };
 
-        const handleRegister = (e) => {
+        const handleRegister = async (e) => {
           e.preventDefault();
-          apiFetch('/register', {
-            method: 'POST',
-            body: new URLSearchParams({ username, password })
-          })
-            .then(res => {
-              if (res.ok) {
-                alert('User created');
-                setMode('login');
-              } else {
-                alert('Registration failed');
-              }
-            })
-            .catch(() => alert('Registration failed'));
+          try {
+            const res = await apiFetch('/register', {
+              method: 'POST',
+              body: new URLSearchParams({ username, password })
+            });
+            if (res.ok) {
+              alert('User created');
+              setMode('login');
+            } else {
+              alert('Registration failed');
+            }
+          } catch (err) {
+            alert('Registration failed');
+          }
         };
 
         if (mode === 'register') {
@@ -382,43 +390,46 @@
 
 
       useEffect(() => {
-        apiFetch('/status')
-          .then(res => res.json())
-          .then(data => setApps(data))
-          .catch(() => {});
-        apiFetch('/templates')
-          .then(res => res.json())
-          .then(data => setTemplates(data))
-          .catch(() => {});
-        apiFetch('/users/me')
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data) {
-              setIsAdmin(data.is_admin);
-              setCurrentUser(data.username);
+        const fetchData = async () => {
+          try {
+            const statusRes = await apiFetch('/status');
+            const statusData = await statusRes.json();
+            setApps(statusData);
+          } catch {}
+          try {
+            const tmplRes = await apiFetch('/templates');
+            const tmplData = await tmplRes.json();
+            setTemplates(tmplData);
+          } catch {}
+          try {
+            const userRes = await apiFetch('/users/me');
+            const userData = userRes.ok ? await userRes.json() : null;
+            if (userData) {
+              setIsAdmin(userData.is_admin);
+              setCurrentUser(userData.username);
             }
-          })
-          .catch(() => {});
+          } catch {}
+        };
+        fetchData();
       }, [token]);
 
-      const refreshStatus = () => {
-        apiFetch('/status')
-          .then(res => res.json())
-          .then(data => setApps(data));
+      const refreshStatus = async () => {
+        const res = await apiFetch('/status');
+        const data = await res.json();
+        setApps(data);
       };
 
       const pollStatus = (appId) => {
-        const interval = setInterval(() => {
-          apiFetch('/status')
-            .then(res => res.json())
-            .then(data => {
-              setApps(data);
-              const app = data.find(a => a.id === appId);
-              if (!app || app.status !== 'stopping') {
-                clearInterval(interval);
-              }
-            })
-            .catch(() => {});
+        const interval = setInterval(async () => {
+          try {
+            const res = await apiFetch('/status');
+            const data = await res.json();
+            setApps(data);
+            const app = data.find(a => a.id === appId);
+            if (!app || app.status !== 'stopping') {
+              clearInterval(interval);
+            }
+          } catch {}
         }, 2000);
       };
 
@@ -428,12 +439,16 @@
       }, []);
 
       useEffect(() => {
-        if (isAdmin) {
-          apiFetch('/users')
-            .then(res => res.json())
-            .then(data => setUsers(data))
-            .catch(() => {});
-        }
+        const fetchUsers = async () => {
+          if (isAdmin) {
+            try {
+              const res = await apiFetch('/users');
+              const data = await res.json();
+              setUsers(data);
+            } catch {}
+          }
+        };
+        fetchUsers();
       }, [isAdmin]);
 
       const handleDragOver = (e) => {
@@ -504,21 +519,20 @@
         xhr.send(formData);
       };
 
-      const toggleLogs = (appId) => {
+      const toggleLogs = async (appId) => {
         if (showLogs[appId]) {
           setShowLogs(prev => ({ ...prev, [appId]: false }));
           return;
         }
-        apiFetch(`/logs/${appId}`)
-          .then(res => res.text())
-          .then(text => {
-            setLogs(prev => ({ ...prev, [appId]: text }));
-            setShowLogs(prev => ({ ...prev, [appId]: true }));
-          })
-          .catch(() => {
-            setLogs(prev => ({ ...prev, [appId]: 'Failed to load logs.' }));
-            setShowLogs(prev => ({ ...prev, [appId]: true }));
-        });
+        try {
+          const res = await apiFetch(`/logs/${appId}`);
+          const text = await res.text();
+          setLogs(prev => ({ ...prev, [appId]: text }));
+          setShowLogs(prev => ({ ...prev, [appId]: true }));
+        } catch {
+          setLogs(prev => ({ ...prev, [appId]: 'Failed to load logs.' }));
+          setShowLogs(prev => ({ ...prev, [appId]: true }));
+        }
       };
 
       const toggleMenu = (appId) => {
@@ -529,76 +543,76 @@
         setOpenMenus(prev => ({ ...prev, [appId]: false }));
       };
 
-      const stopApp = (id) => {
-        apiFetch(`/stop/${id}`, { method: 'POST' })
-          .then(() => {
-            refreshStatus();
-            pollStatus(id);
-          })
-          .catch(() => {});
+      const stopApp = async (id) => {
+        try {
+          await apiFetch(`/stop/${id}`, { method: 'POST' });
+          refreshStatus();
+          pollStatus(id);
+        } catch {}
       };
 
-      const restartApp = (id) => {
-        apiFetch(`/restart/${id}`, { method: 'POST' })
-          .then(() => refreshStatus())
-          .catch(() => {});
+      const restartApp = async (id) => {
+        try {
+          await apiFetch(`/restart/${id}`, { method: 'POST' });
+          refreshStatus();
+        } catch {}
       };
 
-      const deleteApp = (id) => {
+      const deleteApp = async (id) => {
         if (!confirm('Delete this app?')) return;
-        apiFetch(`/apps/${id}`, { method: 'DELETE' })
-          .then(() => {
-            refreshStatus();
-            setLogs(prev => { const n = { ...prev }; delete n[id]; return n; });
-          })
-          .catch(() => {});
+        try {
+          await apiFetch(`/apps/${id}`, { method: 'DELETE' });
+          refreshStatus();
+          setLogs(prev => { const n = { ...prev }; delete n[id]; return n; });
+        } catch {}
       };
 
-      const deployTemplate = (id) => {
-        apiFetch(`/deploy_template/${id}`, { method: 'POST' })
-          .then(() => refreshStatus())
-          .catch(() => {});
+      const deployTemplate = async (id) => {
+        try {
+          await apiFetch(`/deploy_template/${id}`, { method: 'POST' });
+          refreshStatus();
+        } catch {}
       };
 
-      const saveTemplate = (id) => {
-        apiFetch(`/save_template/${id}`, { method: 'POST' })
-          .then(() => {
-            apiFetch('/templates')
-              .then(res => res.json())
-              .then(data => setTemplates(data));
-          })
-          .catch(() => {});
+      const saveTemplate = async (id) => {
+        try {
+          await apiFetch(`/save_template/${id}`, { method: 'POST' });
+          const res = await apiFetch('/templates');
+          const data = await res.json();
+          setTemplates(data);
+        } catch {}
       };
 
-      const deleteTemplate = (id) => {
+      const deleteTemplate = async (id) => {
         if (!confirm('Delete this template?')) return;
-        apiFetch(`/templates/${id}`, { method: 'DELETE' })
-          .then(() => {
-            apiFetch('/templates')
-              .then(res => res.json())
-              .then(data => setTemplates(data));
-          })
-          .catch(() => {});
+        try {
+          await apiFetch(`/templates/${id}`, { method: 'DELETE' });
+          const res = await apiFetch('/templates');
+          const data = await res.json();
+          setTemplates(data);
+        } catch {}
       };
 
-      const deleteUser = (id) => {
+      const deleteUser = async (id) => {
         if (!confirm('Delete this user?')) return;
-        apiFetch(`/users/${id}`, { method: 'DELETE' })
-          .then(() => {
-            setUsers(prev => prev.filter(u => u.id !== id));
-          })
-          .catch(() => {});
+        try {
+          await apiFetch(`/users/${id}`, { method: 'DELETE' });
+          setUsers(prev => prev.filter(u => u.id !== id));
+        } catch {}
       };
 
-      const resetPassword = (id) => {
+      const resetPassword = async (id) => {
         const pwd = prompt('Enter new password');
         if (!pwd) return;
-        apiFetch(`/users/${id}/reset_password`, {
-          method: 'POST',
-          body: new URLSearchParams({ new_password: pwd })
-        })
-          .then(() => alert('Password reset'))
-          .catch(() => alert('Error resetting password'));
+        try {
+          await apiFetch(`/users/${id}/reset_password`, {
+            method: 'POST',
+            body: new URLSearchParams({ new_password: pwd })
+          });
+          alert('Password reset');
+        } catch {
+          alert('Error resetting password');
+        }
       };
 
       const startTemplateEdit = (t) => {
@@ -615,22 +629,23 @@
         setTEditVram('0');
       };
 
-      const saveTemplateEdit = () => {
-        apiFetch('/edit_template', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            template_id: tEditId,
-            name: tEditName,
-            description: tEditDesc,
-            vram_required: parseInt(tEditVram, 10) || 0
-          })
-        }).then(() => {
-          apiFetch('/templates')
-            .then(res => res.json())
-            .then(data => setTemplates(data));
+      const saveTemplateEdit = async () => {
+        try {
+          await apiFetch('/edit_template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              template_id: tEditId,
+              name: tEditName,
+              description: tEditDesc,
+              vram_required: parseInt(tEditVram, 10) || 0
+            })
+          });
+          const res = await apiFetch('/templates');
+          const data = await res.json();
+          setTemplates(data);
           cancelTemplateEdit();
-        }).catch(() => {});
+        } catch {}
       };
 
       const startEdit = (app) => {
@@ -645,15 +660,16 @@
         setEditDesc('');
       };
 
-      const saveEdit = () => {
-        apiFetch('/edit_app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ app_id: editId, name: editName, description: editDesc })
-        }).then(() => {
+      const saveEdit = async () => {
+        try {
+          await apiFetch('/edit_app', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ app_id: editId, name: editName, description: editDesc })
+          });
           refreshStatus();
           cancelEdit();
-        }).catch(() => {});
+        } catch {}
       };
 
       return (
