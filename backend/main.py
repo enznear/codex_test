@@ -907,6 +907,14 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
 
 @app.post("/update_status")
 async def update_status(update: StatusUpdate):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE id=?", (update.app_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="app not found")
+
     heartbeat_time = time.time() if update.status == "running" else None
     save_status(update.app_id, update.status, heartbeat=heartbeat_time, gpu=update.gpu)
     if update.status in ("error", "finished", "stopped"):
@@ -916,6 +924,14 @@ async def update_status(update: StatusUpdate):
 
 @app.post("/heartbeat")
 async def heartbeat(hb: Heartbeat):
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute("SELECT id FROM apps WHERE id=?", (hb.app_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="app not found")
+
     save_status(hb.app_id, heartbeat=time.time())
     return {"detail": "ok"}
 
