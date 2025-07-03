@@ -119,6 +119,9 @@ uvicorn agent.agent:app --port 8001
 - `PROXY_LINK_PATH`: path where the agent attempts to symlink the generated
   Nginx config so it is loaded automatically. Defaults to
   `/etc/nginx/conf.d/apps.conf`.
+- `HUGGINGFACE_HUB_TOKEN`: optional token used by the agent when running apps
+  or installing dependencies. Providing it allows apps to download gated models
+  from Hugging Face. The environment variable `HF_TOKEN` is also respected.
 
 ## Proxy configuration
 

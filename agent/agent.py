@@ -295,6 +295,18 @@ async def build_and_run(req: RunRequest):
         finally:
             remove_route(req.app_id)
         return
+    env = {
+        "PORT": str(req.port),
+        "ROOT_PATH": f"/apps/{req.app_id}",
+    }
+    token = os.environ.get("HUGGINGFACE_HUB_TOKEN")
+    hf_token = os.environ.get("HF_TOKEN")
+    if token:
+        env["HUGGINGFACE_HUB_TOKEN"] = token
+    if hf_token:
+        env["HF_TOKEN"] = hf_token
+    token_value = token or hf_token
+
     if req.type == "docker":
         if not req.reuse_image:
             build_cmd = ["docker", "build", "--network", "host", "-t", req.app_id, req.path]
@@ -324,6 +336,8 @@ async def build_and_run(req: RunRequest):
             "-e",
             f"PORT={req.port}",
         ]
+        if token_value:
+            run_cmd += ["-e", f"HUGGINGFACE_HUB_TOKEN={token_value}"]
         run_cmd += [
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
@@ -331,15 +345,7 @@ async def build_and_run(req: RunRequest):
             req.app_id,
             req.app_id,
         ]
-        proc = await async_run_detached(
-            run_cmd,
-            req.log_path,
-            env={
-                "PORT": str(req.port),
-                "ROOT_PATH": f"/apps/{req.app_id}",
-
-            },
-        )
+        proc = await async_run_detached(run_cmd, req.log_path, env=env)
     elif req.type == "docker_compose":
         compose_file = os.path.join(req.path, "docker-compose.yml")
         if not os.path.exists(compose_file):
@@ -366,7 +372,7 @@ async def build_and_run(req: RunRequest):
             "--build",
             "-d",
         ]
-        ret = await async_run_wait(cmd, req.log_path, env={"PORT": str(req.port), "ROOT_PATH": f"/apps/{req.app_id}"})
+        ret = await async_run_wait(cmd, req.log_path, env=env)
         if ret != 0:
             try:
                 async with httpx.AsyncClient() as client:
@@ -430,6 +436,8 @@ async def build_and_run(req: RunRequest):
             "-e",
             f"PORT={req.port}",
         ]
+        if token_value:
+            run_cmd += ["-e", f"HUGGINGFACE_HUB_TOKEN={token_value}"]
         run_cmd += [
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
@@ -437,15 +445,7 @@ async def build_and_run(req: RunRequest):
             req.app_id,
             run_image,
         ]
-        proc = await async_run_detached(
-            run_cmd,
-            req.log_path,
-            env={
-                "PORT": str(req.port),
-                "ROOT_PATH": f"/apps/{req.app_id}",
-
-            },
-        )
+        proc = await async_run_detached(run_cmd, req.log_path, env=env)
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
         target = py_files[0] if py_files else None
@@ -479,7 +479,7 @@ async def build_and_run(req: RunRequest):
         req_file = os.path.join(req.path, "requirements.txt")
         if os.path.exists(req_file):
             python_path = os.path.join(venv_dir, "bin", "python")
-            ret = await async_run_wait([python_path, "-m", "pip", "install", "-r", req_file], req.log_path)
+            ret = await async_run_wait([python_path, "-m", "pip", "install", "-r", req_file], req.log_path, env=env)
             if ret != 0:
                 try:
                     async with httpx.AsyncClient() as client:
@@ -494,15 +494,7 @@ async def build_and_run(req: RunRequest):
 
         python_path = os.path.join(venv_dir, "bin", "python")
         cmd = [python_path, os.path.join(req.path, target)]
-        proc = await async_run_detached(
-            cmd,
-            req.log_path,
-            env={
-                "PORT": str(req.port),
-                "ROOT_PATH": f"/apps/{req.app_id}",
-
-            },
-        )
+        proc = await async_run_detached(cmd, req.log_path, env=env)
 
     # Store the process along with the type so that cleanup can behave
     # differently for docker vs gradio apps
