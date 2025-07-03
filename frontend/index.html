@@ -582,14 +582,16 @@
 
       const deployTemplate = async (id) => {
         setDeployingTemplates(prev => ({ ...prev, [id]: true }));
+        const template = templates.find(tmp => tmp.id === id) || {};
         try {
-          const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST' });
+          const form = new FormData();
+          form.append('vram_required', template.vram_required);
+          const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST', body: form });
           const data = await res.json();
-          const t = templates.find(tmp => tmp.id === id) || {};
           const placeholder = {
             id: data.app_id,
-            name: t.name || id,
-            description: t.description || '',
+            name: template.name || id,
+            description: template.description || '',
             status: 'deploying',
             url: data.url,
             gpu: null
