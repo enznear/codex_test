@@ -580,6 +580,7 @@
       };
 
       const deployTemplate = async (id) => {
+        setDeployingTemplates(prev => ({ ...prev, [id]: true }));
         try {
           const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST' });
           const data = await res.json();
@@ -596,7 +597,13 @@
           setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
           setApps(prev => [placeholder, ...prev]);
           refreshStatus();
-        } catch {}
+        } catch {
+          setDeployingTemplates(prev => {
+            const n = { ...prev };
+            delete n[id];
+            return n;
+          });
+        }
       };
 
       const saveTemplate = async (id) => {
