@@ -596,7 +596,6 @@
           setDeployingApps(prev => [...prev, placeholder]);
           setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
           setApps(prev => [placeholder, ...prev]);
-          refreshStatus();
         } catch {
           setDeployingTemplates(prev => {
             const n = { ...prev };
