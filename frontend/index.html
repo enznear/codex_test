@@ -313,6 +313,7 @@
       const [mode, setMode] = useState('login');
       const [deployingApps, setDeployingApps] = useState([]);
       const [deployingTemplates, setDeployingTemplates] = useState({});
+      const [savingTemplates, setSavingTemplates] = useState({});
       // Close any open kebab menus when clicking outside
       useEffect(() => {
         const handleClickOutside = () => setOpenMenus({});
@@ -606,12 +607,18 @@
       };
 
       const saveTemplate = async (id) => {
+        setSavingTemplates(prev => ({ ...prev, [id]: true }));
         try {
           await apiFetch(`/save_template/${id}`, { method: 'POST' });
           const res = await apiFetch('/templates');
           const data = await res.json();
           setTemplates(data);
-        } catch {}
+          alert('Template saved');
+        } catch {
+          alert('Failed to save template');
+        } finally {
+          setSavingTemplates(prev => ({ ...prev, [id]: false }));
+        }
       };
 
       const deleteTemplate = async (id) => {
@@ -1070,8 +1077,8 @@
                                       Start
                                     </button>
                                   )}
-                                  <button onClick={() => { saveTemplate(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
-                                    Template
+                                  <button onClick={() => { saveTemplate(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100" disabled={savingTemplates[app.id]}>
+                                    {savingTemplates[app.id] ? 'Saving…' : 'Template'}
                                   </button>
                                   <button onClick={() => { deleteApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-red-600">
                                     Delete App
