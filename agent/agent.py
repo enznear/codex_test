@@ -299,6 +299,7 @@ async def build_and_run(req: RunRequest):
         "PORT": str(req.port),
         "ROOT_PATH": f"/apps/{req.app_id}",
     }
+
     token = os.environ.get("HUGGINGFACE_HUB_TOKEN")
     hf_token = os.environ.get("HF_TOKEN")
     if token:
@@ -306,6 +307,7 @@ async def build_and_run(req: RunRequest):
     if hf_token:
         env["HF_TOKEN"] = hf_token
     token_value = token or hf_token
+
 
     if req.type == "docker":
         if not req.reuse_image:
@@ -336,8 +338,10 @@ async def build_and_run(req: RunRequest):
             "-e",
             f"PORT={req.port}",
         ]
+
         if token_value:
             run_cmd += ["-e", f"HUGGINGFACE_HUB_TOKEN={token_value}"]
+
         run_cmd += [
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
@@ -436,8 +440,10 @@ async def build_and_run(req: RunRequest):
             "-e",
             f"PORT={req.port}",
         ]
+
         if token_value:
             run_cmd += ["-e", f"HUGGINGFACE_HUB_TOKEN={token_value}"]
+
         run_cmd += [
             "-e",
             f"ROOT_PATH=/apps/{req.app_id}",
