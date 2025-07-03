@@ -471,6 +471,9 @@ async def build_and_run(req: RunRequest):
                 remove_route(req.app_id)
             return
 
+        if gpu is not None:
+            env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+
         venv_dir = os.path.join(req.path, "venv")
         python_exe = sys.executable
         ret = await async_run_wait(
