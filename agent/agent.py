@@ -496,6 +496,7 @@ async def build_and_run(req: RunRequest):
             python_path = os.path.join("venv", "bin", "python")
             ret = await async_run_wait(
                 [python_path, "-m", "pip", "install", "-r", "requirements.txt"],
+
                 req.log_path,
                 env=env,
                 cwd=req.path,
@@ -514,6 +515,7 @@ async def build_and_run(req: RunRequest):
 
         python_path = os.path.join("venv", "bin", "python")
         cmd = [python_path, target]
+
         proc = await async_run_detached(cmd, req.log_path, env=env, cwd=req.path)
 
     # Store the process along with the type so that cleanup can behave
