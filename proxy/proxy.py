@@ -57,11 +57,14 @@ def generate_config(routes):
         lines.append(f"        proxy_pass http://127.0.0.1:{info['port']}/;")
         lines.append("        proxy_http_version 1.1;")
         lines.append("        proxy_set_header Upgrade $http_upgrade;")
-        lines.append('        proxy_set_header Connection "upgrade";')
+        lines.append('        proxy_set_header Connection \"upgrade\";')
         lines.append("        proxy_set_header Host $host;")
         lines.append("        proxy_set_header X-Real-IP $remote_addr;")
         lines.append("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;")
         lines.append("        proxy_set_header X-Forwarded-Proto $scheme;")
+        lines.append("        proxy_set_header Range $http_range;")
+        lines.append("        proxy_set_header If-Range $http_if_range;")
+        lines.append("        proxy_buffering off;")
         if info.get("allow_ips"):
             for ip in info["allow_ips"]:
                 lines.append(f"        allow {ip};")
