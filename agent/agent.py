@@ -477,7 +477,7 @@ async def build_and_run(req: RunRequest):
         venv_dir = os.path.join(req.path, "venv")
         python_exe = sys.executable
         ret = await async_run_wait(
-            [python_exe, "-m", "venv", venv_dir], req.log_path, cwd=req.path
+            [python_exe, "-m", "venv", "venv"], req.log_path, cwd=req.path
         )
         if ret != 0:
             try:
@@ -493,9 +493,10 @@ async def build_and_run(req: RunRequest):
 
         req_file = os.path.join(req.path, "requirements.txt")
         if os.path.exists(req_file):
-            python_path = os.path.join(venv_dir, "bin", "python")
+            python_path = os.path.join("venv", "bin", "python")
             ret = await async_run_wait(
-                [python_path, "-m", "pip", "install", "-r", req_file],
+                [python_path, "-m", "pip", "install", "-r", "requirements.txt"],
+
                 req.log_path,
                 env=env,
                 cwd=req.path,
@@ -512,8 +513,9 @@ async def build_and_run(req: RunRequest):
                     remove_route(req.app_id)
                 return
 
-        python_path = os.path.join(venv_dir, "bin", "python")
-        cmd = [python_path, os.path.join(req.path, target)]
+        python_path = os.path.join("venv", "bin", "python")
+        cmd = [python_path, target]
+
         proc = await async_run_detached(cmd, req.log_path, env=env, cwd=req.path)
 
     # Store the process along with the type so that cleanup can behave
