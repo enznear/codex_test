@@ -163,26 +163,30 @@ def run_command(cmd, log_path, wait=True, env=None):
     return process
 
 
-async def async_run_wait(cmd, log_path, env=None):
+async def async_run_wait(cmd, log_path, env=None, cwd=None):
     """Run a command asynchronously and wait for it to finish."""
     env_vars = os.environ.copy()
     if env:
         env_vars.update(env)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     with open(log_path, "a") as log:
-        proc = await asyncio.create_subprocess_exec(*cmd, stdout=log, stderr=log, env=env_vars)
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=log, stderr=log, env=env_vars, cwd=cwd
+        )
         await proc.wait()
         return proc.returncode
 
 
-async def async_run_detached(cmd, log_path, env=None):
+async def async_run_detached(cmd, log_path, env=None, cwd=None):
     """Run a command asynchronously without waiting."""
     env_vars = os.environ.copy()
     if env:
         env_vars.update(env)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     with open(log_path, "a") as log:
-        proc = await asyncio.create_subprocess_exec(*cmd, stdout=log, stderr=log, env=env_vars)
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=log, stderr=log, env=env_vars, cwd=cwd
+        )
     return proc
 
 @app.post("/run")
@@ -467,9 +471,14 @@ async def build_and_run(req: RunRequest):
                 remove_route(req.app_id)
             return
 
+        if gpu is not None:
+            env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+
         venv_dir = os.path.join(req.path, "venv")
         python_exe = sys.executable
-        ret = await async_run_wait([python_exe, "-m", "venv", venv_dir], req.log_path)
+        ret = await async_run_wait(
+            [python_exe, "-m", "venv", "venv"], req.log_path, cwd=req.path
+        )
         if ret != 0:
             try:
                 async with httpx.AsyncClient() as client:
@@ -484,8 +493,13 @@ async def build_and_run(req: RunRequest):
 
         req_file = os.path.join(req.path, "requirements.txt")
         if os.path.exists(req_file):
-            python_path = os.path.join(venv_dir, "bin", "python")
-            ret = await async_run_wait([python_path, "-m", "pip", "install", "-r", req_file], req.log_path, env=env)
+            python_path = os.path.join("venv", "bin", "python")
+            ret = await async_run_wait(
+                [python_path, "-m", "pip", "install", "-r", "requirements.txt"],
+                req.log_path,
+                env=env,
+                cwd=req.path,
+            )
             if ret != 0:
                 try:
                     async with httpx.AsyncClient() as client:
@@ -498,9 +512,9 @@ async def build_and_run(req: RunRequest):
                     remove_route(req.app_id)
                 return
 
-        python_path = os.path.join(venv_dir, "bin", "python")
-        cmd = [python_path, os.path.join(req.path, target)]
-        proc = await async_run_detached(cmd, req.log_path, env=env)
+        python_path = os.path.join("venv", "bin", "python")
+        cmd = [python_path, target]
+        proc = await async_run_detached(cmd, req.log_path, env=env, cwd=req.path)
 
     # Store the process along with the type so that cleanup can behave
     # differently for docker vs gradio apps
