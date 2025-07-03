@@ -790,18 +790,18 @@ async def list_templates():
 
 
 @app.post("/deploy_template/{template_id}")
-async def deploy_template(template_id: str, vram_required: int = Form(0)):
+async def deploy_template(template_id: str, vram_required: int | None = Form(None)):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute(
-        "SELECT name, type, path, description FROM templates WHERE id=?",
+        "SELECT name, type, path, description, vram_required FROM templates WHERE id=?",
         (template_id,),
     )
     row = c.fetchone()
     conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="template not found")
-    name, app_type, stored_path, description = row
+    name, app_type, stored_path, description, template_vram = row
 
     app_id = str(uuid.uuid4())
     app_dir = os.path.join(UPLOAD_DIR, app_id)
@@ -818,6 +818,9 @@ async def deploy_template(template_id: str, vram_required: int = Form(0)):
             break
     if port is None:
         raise HTTPException(status_code=503, detail="no available ports")
+
+    if vram_required is None:
+        vram_required = template_vram
 
     url = f"/apps/{app_id}/"
     save_status(
