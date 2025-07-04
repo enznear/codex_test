@@ -625,9 +625,9 @@
                                             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl">⚡️</span></div>
                                             <h2 className="text-2xl font-bold text-slate-100">Templates</h2>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-2">
                                             {templates.length > 0 ? templates.map(t => (
-                                                <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-primary/50 transition-all duration-200 relative">
+                                                <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 relative">
                                                     <div className="flex justify-between items-start">
                                                         <h3 className="font-semibold text-slate-100">{t.name}</h3>
                                                         <div className="relative z-10" onClick={e => e.stopPropagation()}>
