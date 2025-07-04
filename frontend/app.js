@@ -85,7 +85,7 @@
                         <label className="block text-sm font-medium text-slate-400 mb-2">Password</label>
                         <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
                     </div>
-                    <button type="submit" className="w-full btn-primary text-white py-3 rounded-lg font-semibold">{isRegister ? 'Register' : 'Login'}</button>
+                    <button type="submit" className="btn-primary text-white py-3 px-6 rounded-lg font-semibold block mx-auto">{isRegister ? 'Register' : 'Login'}</button>
                     <p className="text-sm text-center text-slate-400">
                         {isRegister ? 'Already have an account?' : "Don't have an account?"}
                         <a href="#" onClick={(e) => { e.preventDefault(); setMode(isRegister ? 'login' : 'register'); }} className="font-medium text-primary-light hover:underline ml-1">
@@ -563,9 +563,10 @@
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <Switch>
                         <Route exact path="/">
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                            <div className="max-w-5xl mx-auto">
+                                <div className="grid grid-cols-1 gap-8">
                                 {/* Upload Form */}
-                                <div className="lg:col-span-2 space-y-6 animate-slide-up">
+                                <div className="space-y-6 animate-slide-up">
                                     <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
                                         <div className="flex items-center space-x-4 mb-6">
                                             <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl font-bold">+</span></div>
@@ -604,7 +605,7 @@
                                                     </label>
                                                 </div>
                                             </div>
-                                            <button type="submit" className="w-full btn-primary text-white py-3 px-6 rounded-lg font-semibold text-base shadow-lg">Deploy App</button>
+                                            <button type="submit" className="btn-primary text-white py-3 px-6 rounded-lg font-semibold text-base shadow-lg block mx-auto">Deploy App</button>
                                         </form>
                                         {/* Upload Status */}
                                         {uploadProgress > 0 && (
@@ -619,7 +620,7 @@
                                     </div>
                                 </div>
                                 {/* Templates */}
-                                <div className="lg:col-span-3 space-y-6 animate-slide-up">
+                                <div className="space-y-6 animate-slide-up">
                                     <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
                                         <div className="flex items-center space-x-4 mb-6">
                                             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl">⚡️</span></div>
@@ -646,12 +647,13 @@
                                                         <span className="whitespace-nowrap">Type: {t.type}</span>
                                                         <span className="whitespace-nowrap">VRAM: {t.vram_required} MB</span>
                                                     </div>
-                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 w-full btn-primary text-white py-2 rounded-md">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
+                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 btn-primary text-white py-2 px-4 rounded-md block mx-auto">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                             </div>
                         </Route>
                         
