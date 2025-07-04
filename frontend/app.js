@@ -635,7 +635,6 @@
                                                             <button onClick={(e) => toggleTemplateMenu(t.id, e)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-700 text-slate-400">⋯</button>
                                                             {openTemplateMenus[t.id] && (
                                                                 <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-20 animate-fade-in">
-                                                                    <a onClick={() => { deployTemplate(t.id); closeTemplateMenu(t.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer" disabled={deployingTemplates[t.id]}>{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</a>
                                                                     <a onClick={() => { startTemplateEdit(t); closeTemplateMenu(t.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer">Edit</a>
                                                                     <a onClick={() => { deleteTemplate(t.id); closeTemplateMenu(t.id); }} className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 cursor-pointer">Delete</a>
                                                                 </div>
@@ -647,6 +646,7 @@
                                                         <span className="whitespace-nowrap">Type: {t.type}</span>
                                                         <span className="whitespace-nowrap">VRAM: {t.vram_required} MB</span>
                                                     </div>
+                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 w-full btn-primary text-white py-2 rounded-md">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
                                         </div>
