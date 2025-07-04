@@ -1,34 +1,36 @@
+    // Tailwind CSS 다크 모드 및 사용자 정의 테마 설정
     tailwind.config = {
+      darkMode: 'class', // 클래스 기반 다크 모드 활성화
       theme: {
         extend: {
           fontFamily: {
             sans: ['Inter', 'system-ui', 'sans-serif'],
           },
           colors: {
+            // 새로운 색상 팔레트
             primary: {
-              50: '#fff7ed',
-              100: '#ffedd5',
-              500: '#f97316',
-              600: '#ea580c',
-              700: '#c2410c',
+              DEFAULT: '#4f46e5', // indigo-600
+              hover: '#4338ca', // indigo-700
+              light: '#c7d2fe', // indigo-200
             },
-            gray: {
-              50: '#f9fafb',
-              100: '#f3f4f6',
-              200: '#e5e7eb',
-              300: '#d1d5db',
-              400: '#9ca3af',
-              500: '#6b7280',
-              600: '#4b5563',
-              700: '#374151',
-              800: '#1f2937',
-              900: '#111827',
+            secondary: '#7c3aed', // violet-600
+            slate: {
+                50: '#f8fafc',
+                100: '#f1f5f9',
+                200: '#e2e8f0',
+                300: '#cbd5e1',
+                400: '#94a3b8',
+                500: '#64748b',
+                600: '#475569',
+                700: '#334155',
+                800: '#1e293b',
+                900: '#0f172a',
+                950: '#020617'
             }
           },
           animation: {
-            'fade-in': 'fadeIn 0.3s ease-in-out',
-            'slide-up': 'slideUp 0.3s ease-out',
-            'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'fade-in': 'fadeIn 0.5s ease-in-out forwards',
+            'slide-up': 'slideUp 0.5s ease-out forwards',
           },
           keyframes: {
             fadeIn: {
@@ -36,18 +38,21 @@
               '100%': { opacity: '1' },
             },
             slideUp: {
-              '0%': { transform: 'translateY(10px)', opacity: '0' },
+              '0%': { transform: 'translateY(20px)', opacity: '0' },
               '100%': { transform: 'translateY(0)', opacity: '1' },
             }
           }
         }
       }
     }
-    const { useState, useEffect } = React;
+
+    // React 및 React Router 훅 가져오기
+    const { useState, useEffect, useRef } = React;
     const { BrowserRouter, Switch, Route, Link, useLocation } = ReactRouterDOM;
-    
+
     const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
 
+    // API 요청 래퍼 함수
     const apiFetch = async (url, options = {}) => {
       const token = localStorage.getItem('token');
       options.headers = options.headers || {};
@@ -63,1082 +68,568 @@
       return response;
     };
 
-    // 커스텀 드롭다운 컴포넌트
-    const CustomSelect = ({ options, value, onChange, placeholder = "Select..." }) => {
-      const [isOpen, setIsOpen] = useState(false);
-      const [selectedOption, setSelectedOption] = useState(
-        options.find(opt => opt.value === value) || null
-      );
-
-      const handleSelect = (option) => {
-        setSelectedOption(option);
-        onChange(option.value);
-        setIsOpen(false);
-      };
-
-      // 외부 클릭 시 드롭다운 닫기
-      useEffect(() => {
-        const handleClickOutside = (event) => {
-          if (!event.target.closest('.custom-select')) {
-            setIsOpen(false);
-          }
-        };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-      }, []);
-
-      return (
-        <div className="custom-select relative">
-          {/* 선택된 값 표시하는 버튼 */}
-          <button
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200 bg-white text-left flex items-center justify-between hover:border-gray-400"
-          >
-            <span className={selectedOption ? "text-gray-900" : "text-gray-500"}>
-              {selectedOption ? selectedOption.label : placeholder}
-            </span>
-            {/* 화살표 아이콘 */}
-            <svg 
-              className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {/* 드롭다운 옵션 목록 */}
-          {isOpen && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl backdrop-blur-md">
-              <div className="py-1 max-h-60 overflow-auto">
-                {options.map((option, index) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleSelect(option)}
-                    className={`w-full px-4 py-3 text-left hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-150 flex items-center ${
-                      selectedOption?.value === option.value 
-                        ? 'bg-indigo-100 text-indigo-700 font-medium' 
-                        : 'text-gray-900'
-                    } ${index === 0 ? 'rounded-t-lg' : ''} ${index === options.length - 1 ? 'rounded-b-lg' : ''}`}
-                  >
-                    <span>{option.label}</span>
-                    {selectedOption?.value === option.value && (
-                      <svg className="w-4 h-4 ml-auto text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-              </div>
+    // [FIXED] 로그인/등록 폼 컴포넌트 분리
+    const AuthForm = ({ isRegister, username, password, setUsername, setPassword, handleLogin, handleRegister, setMode }) => (
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+            <div className="w-full max-w-md mx-auto animate-slide-up">
+                <form onSubmit={isRegister ? handleRegister : handleLogin} className="bg-slate-900/50 backdrop-blur-lg border border-slate-700 p-8 rounded-2xl shadow-2xl space-y-6">
+                    <div className="text-center">
+                        <h2 className="text-3xl font-bold text-slate-100">{isRegister ? 'Create Account' : 'Welcome Back'}</h2>
+                        <p className="text-slate-400 mt-2">{isRegister ? 'Join our platform today!' : 'Sign in to continue'}</p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Username</label>
+                        <input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Enter your username" value={username} onChange={e => setUsername(e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Password</label>
+                        <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                    </div>
+                    <button type="submit" className="w-full btn-primary text-white py-3 rounded-lg font-semibold">{isRegister ? 'Register' : 'Login'}</button>
+                    <p className="text-sm text-center text-slate-400">
+                        {isRegister ? 'Already have an account?' : "Don't have an account?"}
+                        <a href="#" onClick={(e) => { e.preventDefault(); setMode(isRegister ? 'login' : 'register'); }} className="font-medium text-primary-light hover:underline ml-1">
+                            {isRegister ? 'Sign in' : 'Sign up'}
+                        </a>
+                    </p>
+                </form>
             </div>
-          )}
         </div>
-      );
-    };
-    
-    // Status Badge Component
-    const StatusBadge = ({ status }) => {
-      const getStatusInfo = (status) => {
-        switch (status) {
-          case 'running':
-            return { class: 'status-running pulse', text: 'Running', bg: 'bg-green-100', text_color: 'text-green-800' };
-          case 'stopped':
-            return { class: 'status-stopped', text: 'Stopped', bg: 'bg-red-100', text_color: 'text-red-800' };
-          case 'stopping':
-            return { class: 'status-stopping pulse', text: 'Stopping', bg: 'bg-yellow-100', text_color: 'text-yellow-800' };
-          case 'starting':
-            return { class: 'status-starting pulse', text: 'Starting', bg: 'bg-blue-100', text_color: 'text-blue-800' };
-          case 'building':
-            return { class: 'status-starting pulse', text: 'Building', bg: 'bg-blue-100', text_color: 'text-blue-800' };
-          case 'deploying':
-            return { class: 'status-starting pulse', text: 'Deploying', bg: 'bg-blue-100', text_color: 'text-blue-800' };
-          default:
-            return { class: 'status-stopped', text: 'Unknown', bg: 'bg-gray-100', text_color: 'text-gray-800' };
-        }
-      };
-
-      const statusInfo = getStatusInfo(status);
-      
-      return (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.text_color}`}>
-          <span className={`status-indicator ${statusInfo.class} mr-1.5`}></span>
-          {statusInfo.text}
-        </span>
-      );
-    };
-
-    // Progress Bar Component
-    const ProgressBar = ({ progress }) => (
-      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-        <div 
-          className="progress-bar h-2 rounded-full" 
-          style={{ width: `${progress}%` }}
-        ></div>
-      </div>
     );
 
-    // Main App Component
-    function AppRoutes() {
-      const location = useLocation();
-      const [token, setToken] = useState(localStorage.getItem('token') || '');
-      const [username, setUsername] = useState('');
-      const [password, setPassword] = useState('');
-      const [name, setName] = useState('');
-      const [description, setDescription] = useState('');
-      const [runType, setRunType] = useState('gradio');
-      const [vramRequired, setVramRequired] = useState('0');
-      const [files, setFiles] = useState([]);
-      const [dragActive, setDragActive] = useState(false);
-      const [apps, setApps] = useState([]);
-      const [users, setUsers] = useState([]);
-      const [logs, setLogs] = useState({});
-      const [showLogs, setShowLogs] = useState({});
-      const [uploadMsg, setUploadMsg] = useState('');
-      const [uploadProgress, setUploadProgress] = useState(0);
-      const [templates, setTemplates] = useState([]);
-      const [editId, setEditId] = useState(null);
-      const [editName, setEditName] = useState('');
-      const [editDesc, setEditDesc] = useState('');
-      const [tEditId, setTEditId] = useState(null);
-      const [tEditName, setTEditName] = useState('');
-      const [tEditDesc, setTEditDesc] = useState('');
-      const [tEditVram, setTEditVram] = useState('0');
-      const [openMenus, setOpenMenus] = useState({});
-      const [isAdmin, setIsAdmin] = useState(false);
-      const [currentUser, setCurrentUser] = useState('');
-      const [mode, setMode] = useState('login');
-      const [deployingApps, setDeployingApps] = useState([]);
-      const [deployingTemplates, setDeployingTemplates] = useState({});
-      const [savingTemplates, setSavingTemplates] = useState({});
-      // Close any open kebab menus when clicking outside
-      useEffect(() => {
-        const handleClickOutside = () => setOpenMenus({});
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-      }, []);
+    // 사용자 정의 드롭다운 컴포넌트
+    const CustomSelect = ({ options, value, onChange, placeholder = "Select..." }) => {
+        const [isOpen, setIsOpen] = useState(false);
+        const selectedOption = options.find(opt => opt.value === value) || null;
+        const selectRef = useRef(null);
 
-      if (!token) {
-        const handleLogin = async (e) => {
-          e.preventDefault();
-          try {
-            const res = await apiFetch('/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ username, password })
-            });
-            const data = await res.json();
-            if (data.access_token) {
-              localStorage.setItem('token', data.access_token);
-              setToken(data.access_token);
-              setCurrentUser(data.username || '');
-              if (data.is_admin) setIsAdmin(true);
-
-              // Reload to ensure the main UI renders immediately
-              window.location.href = '/';
-            } else {
-              alert('Login failed');
-            }
-          } catch (err) {
-            alert('Login failed');
-          }
+        const handleSelect = (option) => {
+            onChange(option.value);
+            setIsOpen(false);
         };
 
-        const handleRegister = async (e) => {
-          e.preventDefault();
-          try {
-            const res = await apiFetch('/register', {
-              method: 'POST',
-              body: new URLSearchParams({ username, password })
-            });
-            if (res.ok) {
-              alert('User created');
-              setMode('login');
-            } else {
-              alert('Registration failed');
-            }
-          } catch (err) {
-            alert('Registration failed');
-          }
-        };
-
-        if (mode === 'register') {
-          return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-100">
-              <form onSubmit={handleRegister} className="bg-white p-6 rounded-lg shadow space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Register</h2>
-                <input type="text" className="w-full border rounded p-2" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-                <input type="password" className="w-full border rounded p-2" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-                <button type="submit" className="btn-primary text-white w-full py-2 rounded">Register</button>
-                <p className="text-sm text-center"><a href="#" onClick={() => setMode('login')} className="text-blue-600">Back to login</a></p>
-              </form>
-            </div>
-          );
-        }
-
+        useEffect(() => {
+            const handleClickOutside = (event) => {
+                if (selectRef.current && !selectRef.current.contains(event.target)) {
+                    setIsOpen(false);
+                }
+            };
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }, []);
 
         return (
-          <div className="min-h-screen flex items-center justify-center bg-gray-100">
-            <form onSubmit={handleLogin} className="bg-white p-6 rounded-lg shadow space-y-4">
-              <h2 className="text-xl font-semibold text-gray-900">Login</h2>
-              <input type="text" className="w-full border rounded p-2" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-              <input type="password" className="w-full border rounded p-2" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-              <button type="submit" className="btn-primary text-white w-full py-2 rounded">Login</button>
-              <p className="text-sm text-center"><a href="#" onClick={() => setMode('register')} className="text-blue-600">Register</a></p>
-            </form>
-          </div>
-        );
-      }
-
-
-      useEffect(() => {
-        const fetchData = async () => {
-          try {
-            const statusRes = await apiFetch('/status');
-            const statusData = await statusRes.json();
-            setApps(statusData);
-          } catch {}
-          try {
-            const tmplRes = await apiFetch('/templates');
-            const tmplData = await tmplRes.json();
-            setTemplates(tmplData);
-          } catch {}
-          try {
-            const userRes = await apiFetch('/users/me');
-            const userData = userRes.ok ? await userRes.json() : null;
-            if (userData) {
-              setIsAdmin(userData.is_admin);
-              setCurrentUser(userData.username);
-            }
-          } catch {}
-        };
-        fetchData();
-      }, [token]);
-
-      const refreshStatus = async () => {
-        const res = await apiFetch('/status');
-        const data = await res.json();
-        const existingIds = new Set(data.map(a => a.id));
-        const remainingDeploying = deployingApps.filter(d => !existingIds.has(d.id));
-        setDeployingApps(remainingDeploying);
-        const newDeployingTemplates = { ...deployingTemplates };
-        Object.entries(deployingTemplates).forEach(([tid, aid]) => {
-          if (existingIds.has(aid)) delete newDeployingTemplates[tid];
-        });
-        setDeployingTemplates(newDeployingTemplates);
-        setApps([...remainingDeploying, ...data]);
-      };
-
-      const pollStatus = (appId) => {
-        const interval = setInterval(async () => {
-          try {
-            const res = await apiFetch('/status');
-            const data = await res.json();
-            setApps(data);
-            const app = data.find(a => a.id === appId);
-            if (!app || app.status !== 'stopping') {
-              clearInterval(interval);
-            }
-          } catch {}
-        }, 2000);
-      };
-
-      useEffect(() => {
-        const interval = setInterval(refreshStatus, 2000);
-        return () => clearInterval(interval);
-      }, []);
-
-      useEffect(() => {
-        const fetchUsers = async () => {
-          if (isAdmin) {
-            try {
-              const res = await apiFetch('/users');
-              const data = await res.json();
-              setUsers(data);
-            } catch {}
-          }
-        };
-        fetchUsers();
-      }, [isAdmin]);
-
-      const handleDragOver = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!dragActive) setDragActive(true);
-      };
-
-      const handleDragLeave = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-      };
-
-      const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          setFiles(e.dataTransfer.files);
-          e.dataTransfer.clearData();
-        }
-      };
-
-      const handleUpload = (e) => {
-        e.preventDefault();
-        if (files.length === 0) return;
-        if (files.length > 1) {
-          alert('Multiple files selected. Only the first file will be uploaded. Bundle files into a zip to upload them all.');
-        }
-        const formData = new FormData();
-        formData.append('name', name);
-        formData.append('description', description);
-        formData.append('file', files[0]);
-        formData.append('vram_required', vramRequired);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/upload');
-        const t = localStorage.getItem('token');
-        if (t) {
-          xhr.setRequestHeader('Authorization', 'Bearer ' + t);
-        }
-        setUploadMsg('Upload started');
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            setUploadProgress(Math.round((event.loaded / event.total) * 100));
-          }
-        };
-        xhr.onload = () => {
-          let data = {};
-          try { data = JSON.parse(xhr.responseText); } catch (e) {}
-          setUploadProgress(0);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            setUploadMsg('Upload finished: ' + (data.app_id || ''));
-            setName('');
-            setDescription('');
-            setRunType('gradio');
-            setVramRequired('0');
-            setFiles([]);
-            refreshStatus();
-          } else {
-            setUploadMsg('Error: ' + (data.detail || 'upload failed'));
-          }
-        };
-        xhr.onerror = () => {
-          setUploadMsg('Error uploading app.');
-          setUploadProgress(0);
-        };
-        xhr.send(formData);
-      };
-
-      const toggleLogs = async (appId) => {
-        if (showLogs[appId]) {
-          setShowLogs(prev => ({ ...prev, [appId]: false }));
-          return;
-        }
-        try {
-          const res = await apiFetch(`/logs/${appId}`);
-          const text = await res.text();
-          setLogs(prev => ({ ...prev, [appId]: text }));
-          setShowLogs(prev => ({ ...prev, [appId]: true }));
-        } catch {
-          setLogs(prev => ({ ...prev, [appId]: 'Failed to load logs.' }));
-          setShowLogs(prev => ({ ...prev, [appId]: true }));
-        }
-      };
-
-      const toggleMenu = (appId) => {
-        setOpenMenus(prev => ({ ...prev, [appId]: !prev[appId] }));
-      };
-
-      const closeMenu = (appId) => {
-        setOpenMenus(prev => ({ ...prev, [appId]: false }));
-      };
-
-      const stopApp = async (id) => {
-        try {
-          await apiFetch(`/stop/${id}`, { method: 'POST' });
-          refreshStatus();
-          pollStatus(id);
-        } catch {}
-      };
-
-      const restartApp = async (id) => {
-        try {
-          await apiFetch(`/restart/${id}`, { method: 'POST' });
-          refreshStatus();
-        } catch {}
-      };
-
-      const deleteApp = async (id) => {
-        if (!confirm('Delete this app?')) return;
-        try {
-          await apiFetch(`/apps/${id}`, { method: 'DELETE' });
-          refreshStatus();
-          setLogs(prev => { const n = { ...prev }; delete n[id]; return n; });
-        } catch {}
-      };
-
-      const deployTemplate = async (id) => {
-        setDeployingTemplates(prev => ({ ...prev, [id]: true }));
-        const template = templates.find(tmp => tmp.id === id) || {};
-        try {
-          const form = new FormData();
-          form.append('vram_required', template.vram_required);
-          const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST', body: form });
-          const data = await res.json();
-          const placeholder = {
-            id: data.app_id,
-            name: template.name || id,
-            description: template.description || '',
-            status: 'deploying',
-            url: data.url,
-            gpu: null
-          };
-          setDeployingApps(prev => [...prev, placeholder]);
-          setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
-          setApps(prev => [placeholder, ...prev]);
-        } catch {
-          setDeployingTemplates(prev => {
-            const n = { ...prev };
-            delete n[id];
-            return n;
-          });
-        }
-      };
-
-      const saveTemplate = async (id) => {
-        setSavingTemplates(prev => ({ ...prev, [id]: true }));
-        try {
-          await apiFetch(`/save_template/${id}`, { method: 'POST' });
-          const res = await apiFetch('/templates');
-          const data = await res.json();
-          setTemplates(data);
-          alert('Template saved');
-        } catch {
-          alert('Failed to save template');
-        } finally {
-          setSavingTemplates(prev => ({ ...prev, [id]: false }));
-        }
-      };
-
-      const deleteTemplate = async (id) => {
-        if (!confirm('Delete this template?')) return;
-        try {
-          await apiFetch(`/templates/${id}`, { method: 'DELETE' });
-          const res = await apiFetch('/templates');
-          const data = await res.json();
-          setTemplates(data);
-        } catch {}
-      };
-
-      const deleteUser = async (id) => {
-        if (!confirm('Delete this user?')) return;
-        try {
-          await apiFetch(`/users/${id}`, { method: 'DELETE' });
-          setUsers(prev => prev.filter(u => u.id !== id));
-        } catch {}
-      };
-
-      const resetPassword = async (id) => {
-        const pwd = prompt('Enter new password');
-        if (!pwd) return;
-        try {
-          await apiFetch(`/users/${id}/reset_password`, {
-            method: 'POST',
-            body: new URLSearchParams({ new_password: pwd })
-          });
-          alert('Password reset');
-        } catch {
-          alert('Error resetting password');
-        }
-      };
-
-      const startTemplateEdit = (t) => {
-        setTEditId(t.id);
-        setTEditName(t.name || '');
-        setTEditDesc(t.description || '');
-        setTEditVram(String(t.vram_required || 0));
-      };
-
-      const cancelTemplateEdit = () => {
-        setTEditId(null);
-        setTEditName('');
-        setTEditDesc('');
-        setTEditVram('0');
-      };
-
-      const saveTemplateEdit = async () => {
-        try {
-          await apiFetch('/edit_template', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              template_id: tEditId,
-              name: tEditName,
-              description: tEditDesc,
-              vram_required: parseInt(tEditVram, 10) || 0
-            })
-          });
-          const res = await apiFetch('/templates');
-          const data = await res.json();
-          setTemplates(data);
-          cancelTemplateEdit();
-        } catch {}
-      };
-
-      const startEdit = (app) => {
-        setEditId(app.id);
-        setEditName(app.name || '');
-        setEditDesc(app.description || '');
-      };
-
-      const cancelEdit = () => {
-        setEditId(null);
-        setEditName('');
-        setEditDesc('');
-      };
-
-      const saveEdit = async () => {
-        try {
-          await apiFetch('/edit_app', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ app_id: editId, name: editName, description: editDesc })
-          });
-          refreshStatus();
-          cancelEdit();
-        } catch {}
-      };
-
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-          {/* Header */}
-          <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center py-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">AI</span>
-                  </div>
-                  <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                    AI App Portal
-                  </Link>
-                </div>
-                
-                <nav className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-                  <Link
-                    to="/"
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                      location.pathname === '/'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Create App
-                  </Link>
-                  <Link
-                    to="/apps"
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                      location.pathname === '/apps'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    My Apps ({apps.length})
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      to="/user-admin"
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                        location.pathname === '/user-admin'
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      Users
-                    </Link>
-                  )}
-                  {currentUser && (
-                    <span className="px-4 py-2 text-sm text-gray-600">
-                      Logged in as {currentUser}
+            <div className="custom-select relative" ref={selectRef}>
+                <button
+                    type="button"
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/50 focus:outline-none transition-all duration-200 bg-slate-700 text-left flex items-center justify-between hover:border-slate-500"
+                >
+                    <span className={selectedOption ? "text-slate-100" : "text-slate-400"}>
+                        {selectedOption ? selectedOption.label : placeholder}
                     </span>
-                  )}
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('token');
-                      setToken('');
-                      setCurrentUser('');
-                      setIsAdmin(false);
-                      window.location.href = '/';
-                    }}
-                    className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900"
-                  >
-                    Logout
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </header>
+                    <svg className={`w-5 h-5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
 
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <Switch>
-              <Route exact path="/">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Upload Form */}
-                  <div className="space-y-6">
-                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-8 card-hover">
-                      <div className="flex items-center space-x-3 mb-6">
-                        <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                          <span className="text-white text-lg">+</span>
-                        </div>
-                        <h2 className="text-xl font-semibold text-gray-900">Deploy New App</h2>
-                      </div>
-                      
-                      <form onSubmit={handleUpload} className="space-y-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">App Name</label>
-                          <input 
-                            type="text" 
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                            placeholder="My Awesome AI App" 
-                            value={name} 
-                            onChange={e => setName(e.target.value)} 
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                          <textarea 
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                            placeholder="Brief description of your app..." 
-                            rows="3"
-                            value={description} 
-                            onChange={e => setDescription(e.target.value)} 
-                          />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Runtime</label>
-                            <CustomSelect
-                              options={[
-                                { value: 'gradio', label: 'Gradio' },
-                                { value: 'docker', label: 'Docker' }
-                              ]}
-                              value={runType}
-                              onChange={(value) => setRunType(value)}
-                              placeholder="Select runtime..."
-                            />                            
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">VRAM (MB)</label>
-                            <input 
-                              type="number" 
-                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                              placeholder="0" 
-                              value={vramRequired} 
-                              onChange={e => setVramRequired(e.target.value)} 
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Files</label>
-                          <div
-                            className={`upload-area border-2 border-dashed border-indigo-300 rounded-lg p-6 text-center ${dragActive ? 'drag-active' : ''}`}
-                            onDragOver={handleDragOver}
-                            onDragEnter={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                          >
-                            <input 
-                              type="file" 
-                              className="hidden" 
-                              id="file-upload"
-                              onChange={e => setFiles(e.target.files)} 
-                              multiple 
-                            />
-                            <label htmlFor="file-upload" className="cursor-pointer">
-                              <div className="text-gray-400 mb-2">
-                                <svg className="mx-auto h-12 w-12" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              </div>
-                              <p className="text-sm text-gray-600">
-                                Click to upload or drag and drop
-                              </p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                ZIP, PY, or any project files
-                              </p>
-                            </label>
-                            {files.length > 0 && (
-                              <p className="mt-2 text-sm text-indigo-600 font-medium">
-                                {files.length} file(s) selected
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <button 
-                          type="submit" 
-                          className="w-full btn-primary text-white py-3 px-6 rounded-lg font-medium shadow-lg"
-                        >
-                          Deploy App
-                        </button>
-                      </form>
-                      
-                      {uploadProgress > 0 && uploadProgress < 100 && (
-                        <div className="mt-4">
-                          <div className="flex justify-between text-sm text-gray-600 mb-2">
-                            <span>Uploading...</span>
-                            <span>{uploadProgress}%</span>
-                          </div>
-                          <ProgressBar progress={uploadProgress} />
-                        </div>
-                      )}
-                      
-                      {uploadMsg && (
-                        <div className={`mt-4 p-3 rounded-lg text-sm ${
-                          uploadMsg.includes('Error') 
-                            ? 'bg-red-50 text-red-700 border border-red-200' 
-                            : 'bg-green-50 text-green-700 border border-green-200'
-                        }`}>
-                          {uploadMsg}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Templates */}
-                  <div className="space-y-6">
-                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-8">
-                      <div className="flex items-center space-x-3 mb-6">
-                        <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
-                          <span className="text-white text-lg">⚡</span>
-                        </div>
-                        <h2 className="text-xl font-semibold text-gray-900">Quick Deploy Templates</h2>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                        {templates.length === 0 ? (
-                          <div className="text-center py-8 text-gray-500">
-                            <p>No templates available yet.</p>
-                            <p className="text-sm mt-1">Deploy an app first, then save it as a template!</p>
-                          </div>
-                        ) : (
-                          templates.map(t => (
-                            <div key={t.id} className="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 transition-all duration-200">
-                              {tEditId === t.id ? (
-                                <div className="space-y-3">
-                                  <div className="space-y-1">
-                                    <label className="text-sm text-gray-700">Name</label>
-                                    <input
-                                      type="text"
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                                      placeholder="Template Name"
-                                      value={tEditName}
-                                      onChange={e => setTEditName(e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <label className="text-sm text-gray-700">Description</label>
-                                    <textarea
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                                      placeholder="Description"
-                                      rows="2"
-                                      value={tEditDesc}
-                                      onChange={e => setTEditDesc(e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <label className="text-sm text-gray-700">VRAM (MB)</label>
-                                    <input
-                                      type="number"
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                                      placeholder="VRAM (MB)"
-                                      value={tEditVram}
-                                      onChange={e => setTEditVram(e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="flex space-x-2">
-                                    <button 
-                                      onClick={saveTemplateEdit} 
-                                      className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium"
-                                    >
-                                      Save
-                                    </button>
-                                    <button 
-                                      onClick={cancelTemplateEdit} 
-                                      className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                      <h3 className="font-medium text-gray-900">{t.name}</h3>
-                                      <p className="text-sm text-gray-600 mt-1">{t.description}</p>
-                                      <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                        <span>Type: {t.type}</span>
-                                        <span>VRAM: {t.vram_required} MB</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex space-x-2">
-                                    <button
-                                      onClick={() => deployTemplate(t.id)}
-                                      className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium flex-1"
-                                      disabled={deployingTemplates[t.id]}
-                                    >
-                                      {deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}
-                                    </button>
-                                    <button 
-                                      onClick={() => startTemplateEdit(t)} 
-                                      className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button 
-                                      onClick={() => deleteTemplate(t.id)} 
-                                      className="bg-red-50 text-red-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-100 transition-colors"
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Route>
-              
-              <Route path="/apps">
-                <div className="space-y-6">
-                  <div className="text-center mb-8">
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Your AI Applications</h2>
-                    <p className="text-gray-600">Manage and monitor your deployed applications</p>
-                  </div>
-                  
-                  {apps.length === 0 ? (
-                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-12 text-center">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-2xl text-gray-400">📱</span>
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No apps deployed yet</h3>
-                      <p className="text-gray-600 mb-6">Get started by creating your first AI application</p>
-                      <Link 
-                        to="/" 
-                        className="btn-primary text-white px-6 py-3 rounded-lg font-medium inline-block"
-                      >
-                        Create Your First App
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {apps.map(app => (
-                        <div
-                          key={app.id}
-                          className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-6 card-hover cursor-pointer relative overflow-hidden"
-                          onClick={() => app.url && window.open(`${nginxBase}${app.url}`, '_blank')}
-                        >
-                          {/* Status indicator overlay with actions */}
-                          <div className="absolute top-4 right-4 flex items-center space-x-2 z-10" onClick={e => e.stopPropagation()}>
-                            <StatusBadge status={app.status} />
-                            <div className="relative">
-                              <button
-                                onClick={e => { e.stopPropagation(); toggleMenu(app.id); }}
-                                className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
-                              >
-                                ⋯
-
-                              </button>
-                              {openMenus[app.id] && (
-                                <div className="absolute right-0 mt-2 w-32 bg-white border rounded shadow-lg">
-                                  <button onClick={() => { toggleLogs(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
-                                    {showLogs[app.id] ? 'Hide Logs' : 'Logs'}
-                                  </button>
-                                  <button onClick={() => { startEdit(app); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
-                                    Edit
-                                  </button>
-                                  {app.status === 'running' ? (
-                                    <button onClick={() => { stopApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
-                                      Stop
-                                    </button>
-                                  ) : (
-                                    <button onClick={() => { restartApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100">
-                                      Start
-                                    </button>
-                                  )}
-                                  <button onClick={() => { saveTemplate(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100" disabled={savingTemplates[app.id]}>
-                                    {savingTemplates[app.id] ? 'Saving…' : 'Template'}
-                                  </button>
-                                  <button onClick={() => { deleteApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 text-red-600">
-                                    Delete App
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="mb-4">
-                            <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mb-3">
-                              <span className="text-white font-bold">
-                                {(app.name || app.id).charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            
-                            <h3 className="text-xl font-semibold text-gray-900 mb-1 pr-20">
-                              {app.name || app.id}
-                            </h3>
-                            <p className="text-xs text-gray-500 font-mono">ID: {app.id}</p>
-                            
-                            {app.description && (
-                              <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                                {app.description}
-                              </p>
-                            )}
-                            
-                            {app.gpu !== null && app.gpu !== undefined && (
-                              <div className="mt-3 flex items-center space-x-2">
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                  🎮 GPU {app.gpu}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {editId === app.id ? (
-                            <div className="space-y-3 mt-4" onClick={e => e.stopPropagation()}>
-                              <div className="space-y-1">
-                                <label className="text-sm text-gray-700">Name</label>
-                                <input
-                                  type="text"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                                  placeholder="App Name"
-                                  value={editName}
-                                  onChange={e => setEditName(e.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-sm text-gray-700">Description</label>
-                                <textarea
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all duration-200"
-                                  placeholder="Description"
-                                  rows="2"
-                                  value={editDesc}
-                                  onChange={e => setEditDesc(e.target.value)}
-                                />
-                              </div>
-                              <div className="flex space-x-2">
+                {isOpen && (
+                    <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl backdrop-blur-md animate-fade-in">
+                        <div className="py-1 max-h-60 overflow-auto">
+                            {options.map((option) => (
                                 <button
-                                  onClick={saveEdit}
-                                  className="btn-primary text-white px-3 py-1.5 rounded-md text-sm font-medium flex-1"
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => handleSelect(option)}
+                                    className={`w-full px-4 py-3 text-left hover:bg-slate-700/50 hover:text-primary-light transition-all duration-150 flex items-center ${selectedOption?.value === option.value ? 'bg-primary/20 text-primary-light font-medium' : 'text-slate-200'}`}
                                 >
-                                  Save
+                                    <span>{option.label}</span>
+                                    {selectedOption?.value === option.value && (
+                                        <svg className="w-4 h-4 ml-auto text-primary-light" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                    )}
                                 </button>
-                                <button
-                                  onClick={cancelEdit}
-                                  className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <></>
-                          )}
-                          
-                          {/* Logs panel */}
-                          {showLogs[app.id] && (
-                            <div className="mt-4 border-t border-gray-200 pt-4" onClick={e => e.stopPropagation()}>
-                              <div className="bg-gray-900 rounded-lg p-4 max-h-48 overflow-auto">
-                                <pre className="text-green-400 text-xs font-mono whitespace-pre-wrap">
-                                  {logs[app.id] || 'Loading logs...'}
-                                </pre>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Click indicator */}
-                          {app.url && app.status === 'running' && (
-                            <div className="absolute bottom-1 left-6 text-xs text-gray-400">
-                              Click to open app →
-                            </div>
-                          )}
+                            ))}
                         </div>
-                      ))}
                     </div>
-                  )}
-                </div>
-              </Route>
-              {isAdmin && (
-                <Route path="/user-admin">
-                  <div className="space-y-6">
-                    <div className="text-center mb-8">
-                      <h2 className="text-3xl font-bold text-gray-900 mb-2">User Management</h2>
-                    </div>
-                    <div className="bg-white rounded-2xl shadow-xl border border-gray-200/50 p-8">
-                      {users.length === 0 ? (
-                        <p className="text-gray-500">No users.</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {users.map(u => (
-                            <li key={u.id} className="flex justify-between items-center border rounded px-3 py-2">
-                              <span>{u.username}{u.is_admin ? ' (admin)' : ''}</span>
-                              <div className="space-x-2">
-                                {!u.is_admin && (
-                                  <button onClick={() => deleteUser(u.id)} className="text-red-600 hover:underline">
-                                    Delete
-                                  </button>
-                                )}
-                                <button onClick={() => resetPassword(u.id)} className="text-blue-600 hover:underline">
-                                  Reset Password
-                                </button>
-                              </div>
-
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                </Route>
-              )}
-            </Switch>
-          </main>
-          
-          {/* Footer */}
-          <footer className="bg-white/50 backdrop-blur-md border-t border-gray-200/50 mt-16">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <div className="text-center text-gray-600">
-                <p className="text-sm">
-                  AI App Portal - Deploy and manage your AI applications with ease
-                </p>
-                <p className="text-xs mt-2 text-gray-400">
-                  Built with modern web technologies for optimal performance
-                </p>
-              </div>
+                )}
             </div>
-          </footer>
+        );
+    };
+
+    // 상태 배지 컴포넌트
+    const StatusBadge = ({ status }) => {
+        const getStatusInfo = (status) => {
+            switch (status) {
+                case 'running': return { class: 'status-running pulse', text: 'Running', bg: 'bg-green-500/10', text_color: 'text-green-400' };
+                case 'stopped': return { class: 'status-stopped', text: 'Stopped', bg: 'bg-red-500/10', text_color: 'text-red-400' };
+                case 'stopping': return { class: 'status-stopping pulse', text: 'Stopping', bg: 'bg-amber-500/10', text_color: 'text-amber-400' };
+                case 'starting': return { class: 'status-starting pulse', text: 'Starting', bg: 'bg-blue-500/10', text_color: 'text-blue-400' };
+                case 'building': return { class: 'status-building pulse', text: 'Building', bg: 'bg-blue-500/10', text_color: 'text-blue-400' };
+                case 'deploying': return { class: 'status-deploying pulse', text: 'Deploying', bg: 'bg-blue-500/10', text_color: 'text-blue-400' };
+                default: return { class: '', text: 'Unknown', bg: 'bg-slate-500/10', text_color: 'text-slate-400' };
+            }
+        };
+        const statusInfo = getStatusInfo(status);
+        return (
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.text_color}`}>
+                <span className={`status-indicator ${statusInfo.class} mr-1.5`}></span>
+                {statusInfo.text}
+            </span>
+        );
+    };
+
+    // 진행률 바 컴포넌트
+    const ProgressBar = ({ progress }) => (
+        <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+            <div className="progress-bar h-2 rounded-full" style={{ width: `${progress}%` }}></div>
         </div>
-      );
+    );
+
+    // 메인 앱 컴포넌트
+    function AppRoutes() {
+        const location = useLocation();
+        const [token, setToken] = useState(localStorage.getItem('token') || '');
+        const [username, setUsername] = useState('');
+        const [password, setPassword] = useState('');
+        const [name, setName] = useState('');
+        const [description, setDescription] = useState('');
+        const [runType, setRunType] = useState('gradio');
+        const [vramRequired, setVramRequired] = useState('0');
+        const [files, setFiles] = useState([]);
+        const [dragActive, setDragActive] = useState(false);
+        const [apps, setApps] = useState([]);
+        const [users, setUsers] = useState([]);
+        const [logs, setLogs] = useState({});
+        const [showLogs, setShowLogs] = useState({});
+        const [uploadMsg, setUploadMsg] = useState('');
+        const [uploadProgress, setUploadProgress] = useState(0);
+        const [templates, setTemplates] = useState([]);
+        const [editId, setEditId] = useState(null);
+        const [editName, setEditName] = useState('');
+        const [editDesc, setEditDesc] = useState('');
+        const [tEditId, setTEditId] = useState(null);
+        const [tEditName, setTEditName] = useState('');
+        const [tEditDesc, setTEditDesc] = useState('');
+        const [tEditVram, setTEditVram] = useState('0');
+        const [openMenus, setOpenMenus] = useState({});
+        const [isAdmin, setIsAdmin] = useState(false);
+        const [currentUser, setCurrentUser] = useState('');
+        const [mode, setMode] = useState('login');
+        const [deployingApps, setDeployingApps] = useState([]);
+        const [deployingTemplates, setDeployingTemplates] = useState({});
+        const [savingTemplates, setSavingTemplates] = useState({});
+
+        // 메뉴 외부 클릭 시 닫기
+        useEffect(() => {
+            const handleClickOutside = () => setOpenMenus({});
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }, []);
+        
+        // 로그인/등록 처리
+        if (!token) {
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                try {
+                    const res = await apiFetch('/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({ username, password })
+                    });
+                    const data = await res.json();
+                    if (data.access_token) {
+                        localStorage.setItem('token', data.access_token);
+                        setToken(data.access_token);
+                    } else {
+                        alert('Login failed');
+                    }
+                } catch (err) {
+                    alert('Login failed');
+                }
+            };
+
+            const handleRegister = async (e) => {
+                e.preventDefault();
+                try {
+                    const res = await apiFetch('/register', {
+                        method: 'POST',
+                        body: new URLSearchParams({ username, password })
+                    });
+                    if (res.ok) {
+                        alert('User created');
+                        setMode('login');
+                    } else {
+                        alert('Registration failed');
+                    }
+                } catch (err) {
+                    alert('Registration failed');
+                }
+            };
+            
+            return (
+                <AuthForm
+                    isRegister={mode === 'register'}
+                    username={username}
+                    password={password}
+                    setUsername={setUsername}
+                    setPassword={setPassword}
+                    handleLogin={handleLogin}
+                    handleRegister={handleRegister}
+                    setMode={setMode}
+                />
+            );
+        }
+
+        // 데이터 가져오기 및 상태 폴링
+        useEffect(() => {
+            const fetchData = async () => {
+                try {
+                    const [statusRes, tmplRes, userRes] = await Promise.all([
+                        apiFetch('/status'),
+                        apiFetch('/templates'),
+                        apiFetch('/users/me')
+                    ]);
+                    const statusData = await statusRes.json();
+                    setApps(statusData);
+                    const tmplData = await tmplRes.json();
+                    setTemplates(tmplData);
+                    const userData = userRes.ok ? await userRes.json() : null;
+                    if (userData) {
+                        setIsAdmin(userData.is_admin);
+                        setCurrentUser(userData.username);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch initial data:", error);
+                }
+            };
+            fetchData();
+        }, [token]);
+
+        const refreshStatus = async () => {
+            try {
+                const res = await apiFetch('/status');
+                const data = await res.json();
+                const existingIds = new Set(data.map(a => a.id));
+                const remainingDeploying = deployingApps.filter(d => !existingIds.has(d.id));
+                setDeployingApps(remainingDeploying);
+                const newDeployingTemplates = { ...deployingTemplates };
+                Object.entries(deployingTemplates).forEach(([tid, aid]) => {
+                    if (existingIds.has(aid)) delete newDeployingTemplates[tid];
+                });
+                setDeployingTemplates(newDeployingTemplates);
+                setApps([...remainingDeploying, ...data]);
+            } catch (error) {
+                console.error("Failed to refresh status:", error);
+            }
+        };
+
+        useEffect(() => {
+            const interval = setInterval(refreshStatus, 2000);
+            return () => clearInterval(interval);
+        }, [deployingApps, deployingTemplates]);
+        
+        const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); if (!dragActive) setDragActive(true); };
+        const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); };
+        const handleDrop = (e) => {
+            e.preventDefault(); e.stopPropagation(); setDragActive(false);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                setFiles(e.dataTransfer.files);
+                e.dataTransfer.clearData();
+            }
+        };
+        
+        const handleUpload = async (e) => {
+            e.preventDefault();
+            if (files.length === 0) {
+                setUploadMsg('Error: Please select a file to upload.');
+                return;
+            }
+        
+            setUploadMsg('Upload started...');
+            setUploadProgress(50);
+        
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('description', description);
+            formData.append('file', files[0]);
+            formData.append('vram_required', vramRequired);
+        
+            try {
+                const res = await apiFetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+        
+                const data = await res.json();
+        
+                if (res.ok) {
+                    setUploadMsg('Upload finished: ' + (data.app_id || ''));
+                    setName('');
+                    setDescription('');
+                    setRunType('gradio');
+                    setVramRequired('0');
+                    setFiles([]);
+                    await refreshStatus();
+                } else {
+                    setUploadMsg('Error: ' + (data.detail || 'upload failed'));
+                }
+            } catch (error) {
+                setUploadMsg('Error uploading app.');
+                console.error("Upload error:", error);
+            } finally {
+                setTimeout(() => setUploadProgress(0), 3000);
+            }
+        };
+
+        const toggleLogs = async (appId) => {
+            if (showLogs[appId]) {
+                setShowLogs(prev => ({ ...prev, [appId]: false })); return;
+            }
+            try {
+                const res = await apiFetch(`/logs/${appId}`);
+                const text = await res.text();
+                setLogs(prev => ({ ...prev, [appId]: text }));
+                setShowLogs(prev => ({ ...prev, [appId]: true }));
+            } catch {
+                setLogs(prev => ({ ...prev, [appId]: 'Failed to load logs.' }));
+                setShowLogs(prev => ({ ...prev, [appId]: true }));
+            }
+        };
+        const toggleMenu = (appId, e) => { e.stopPropagation(); setOpenMenus(prev => ({ [appId]: !prev[appId] })); };
+        const closeMenu = (appId) => setOpenMenus(prev => ({ ...prev, [appId]: false }));
+        const stopApp = async (id) => { await apiFetch(`/stop/${id}`, { method: 'POST' }); refreshStatus(); };
+        const restartApp = async (id) => { await apiFetch(`/restart/${id}`, { method: 'POST' }); refreshStatus(); };
+        const deleteApp = async (id) => {
+            await apiFetch(`/apps/${id}`, { method: 'DELETE' });
+            refreshStatus();
+        };
+        const deployTemplate = async (id) => {
+            setDeployingTemplates(prev => ({ ...prev, [id]: true }));
+            const template = templates.find(tmp => tmp.id === id) || {};
+            try {
+                const form = new FormData();
+                form.append('vram_required', template.vram_required);
+                const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST', body: form });
+                const data = await res.json();
+                const placeholder = { id: data.app_id, name: template.name || id, description: template.description || '', status: 'deploying', url: data.url, gpu: null };
+                setDeployingApps(prev => [...prev, placeholder]);
+                setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
+                setApps(prev => [placeholder, ...prev]);
+            } catch {
+                setDeployingTemplates(prev => { const n = { ...prev }; delete n[id]; return n; });
+            }
+        };
+        const saveTemplate = async (id) => {
+            setSavingTemplates(prev => ({ ...prev, [id]: true }));
+            try {
+                await apiFetch(`/save_template/${id}`, { method: 'POST' });
+                const res = await apiFetch('/templates');
+                setTemplates(await res.json());
+                alert('Template saved');
+            } catch { alert('Failed to save template'); } 
+            finally { setSavingTemplates(prev => ({ ...prev, [id]: false })); }
+        };
+        const deleteTemplate = async (id) => {
+            await apiFetch(`/templates/${id}`, { method: 'DELETE' });
+            const res = await apiFetch('/templates');
+            setTemplates(await res.json());
+        };
+        const startEdit = (app) => { setEditId(app.id); setEditName(app.name || ''); setEditDesc(app.description || ''); };
+        const cancelEdit = () => { setEditId(null); setEditName(''); setEditDesc(''); };
+        const saveEdit = async () => {
+            await apiFetch('/edit_app', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app_id: editId, name: editName, description: editDesc }) });
+            refreshStatus(); cancelEdit();
+        };
+
+        return (
+            <div className="min-h-screen bg-slate-900">
+                {/* Header */}
+                <header className="bg-slate-900/70 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex justify-between items-center py-4">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-9 h-9 bg-gradient-to-r from-primary to-secondary rounded-lg flex items-center justify-center shadow-lg">
+                                    <span className="text-white font-bold text-lg">A</span>
+                                </div>
+                                <Link to="/" className="text-xl font-bold bg-gradient-to-r from-slate-200 to-slate-400 bg-clip-text text-transparent">AI Portal</Link>
+                            </div>
+                            
+                            <nav className="flex items-center space-x-2 bg-slate-800 rounded-lg p-1">
+                                {[{path: '/', label: 'Create App'}, {path: '/apps', label: `My Apps (${apps.length})`}, isAdmin && {path: '/user-admin', label: 'Users'}].filter(Boolean).map(item => (
+                                    <Link key={item.path} to={item.path} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${location.pathname === item.path ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}>{item.label}</Link>
+                                ))}
+                            </nav>
+
+                            <div className="flex items-center space-x-4">
+                                {currentUser && <span className="text-sm text-slate-400">Welcome, {currentUser}</span>}
+                                <button onClick={() => { localStorage.removeItem('token'); setToken(''); }} className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">Logout</button>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                    <Switch>
+                        <Route exact path="/">
+                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                                {/* Upload Form */}
+                                <div className="lg:col-span-3 space-y-6 animate-slide-up">
+                                    <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
+                                        <div className="flex items-center space-x-4 mb-6">
+                                            <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl font-bold">+</span></div>
+                                            <h2 className="text-2xl font-bold text-slate-100">Deploy New App</h2>
+                                        </div>
+                                        
+                                        <form onSubmit={handleUpload} className="space-y-6">
+                                            {/* Form Fields */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-400 mb-2">App Name</label>
+                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="My Awesome AI App" value={name} onChange={e => setName(e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
+                                                <textarea className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Brief description of your app..." rows="3" value={description} onChange={e => setDescription(e.target.value)} />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-400 mb-2">Runtime</label>
+                                                    <CustomSelect options={[{ value: 'gradio', label: 'Gradio' }, { value: 'docker', label: 'Docker' }]} value={runType} onChange={(value) => setRunType(value)} />                            
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-400 mb-2">VRAM (MB)</label>
+                                                    <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="0" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-400 mb-2">Upload Files</label>
+                                                <div className={`upload-area border-2 border-dashed rounded-lg p-8 text-center ${dragActive ? 'drag-active' : ''}`} onDragOver={handleDragOver} onDragEnter={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+                                                    <input type="file" className="hidden" id="file-upload" onChange={e => setFiles(e.target.files)} multiple />
+                                                    <label htmlFor="file-upload" className="cursor-pointer">
+                                                        <svg className="mx-auto h-12 w-12 text-slate-500" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                                        <p className="mt-4 text-sm text-slate-300">Click to upload or <span className="font-semibold text-primary-light">drag and drop</span></p>
+                                                        <p className="text-xs text-slate-500 mt-1">ZIP, PY, or any project files</p>
+                                                        {files.length > 0 && <p className="mt-3 text-sm text-primary-light font-medium">{files.length} file(s) selected</p>}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <button type="submit" className="w-full btn-primary text-white py-3 px-6 rounded-lg font-semibold text-base shadow-lg">Deploy App</button>
+                                        </form>
+                                        {/* Upload Status */}
+                                        {uploadProgress > 0 && (
+                                            <div className="mt-4">
+                                                <div className="flex justify-between text-sm text-slate-400 mb-2"><span>Uploading...</span></div>
+                                                <ProgressBar progress={uploadProgress} />
+                                            </div>
+                                        )}
+                                        {uploadMsg && (
+                                            <div className={`mt-4 p-3 rounded-lg text-sm ${uploadMsg.includes('Error') ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>{uploadMsg}</div>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Templates */}
+                                <div className="lg:col-span-2 space-y-6 animate-slide-up" style={{animationDelay: '0.2s'}}>
+                                    <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
+                                        <div className="flex items-center space-x-4 mb-6">
+                                            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl">⚡️</span></div>
+                                            <h2 className="text-2xl font-bold text-slate-100">Templates</h2>
+                                        </div>
+                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                                            {templates.length > 0 ? templates.map(t => (
+                                                <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-primary/50 transition-all duration-200">
+                                                    <h3 className="font-semibold text-slate-100">{t.name}</h3>
+                                                    <p className="text-sm text-slate-400 mt-1">{t.description}</p>
+                                                    <div className="flex items-center space-x-4 mt-3 text-xs text-slate-500">
+                                                        <span>Type: {t.type}</span><span>VRAM: {t.vram_required} MB</span>
+                                                    </div>
+                                                    <div className="mt-4 flex space-x-2">
+                                                        <button onClick={() => deployTemplate(t.id)} className="flex-1 bg-primary text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary-hover transition-colors" disabled={deployingTemplates[t.id]}>{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
+                                                        <button onClick={() => deleteTemplate(t.id)} className="bg-red-500/10 text-red-400 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-500/20 transition-colors">Delete</button>
+                                                    </div>
+                                                </div>
+                                            )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </Route>
+                        
+                        <Route path="/apps">
+                            <div className="space-y-8 animate-fade-in">
+                                <div className="text-center">
+                                    <h2 className="text-4xl font-bold text-slate-100">Your AI Applications</h2>
+                                    <p className="text-slate-400 mt-2">Manage and monitor your deployed applications</p>
+                                </div>
+                                {apps.length === 0 ? (
+                                    <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-12 text-center">
+                                        <h3 className="text-xl font-semibold text-slate-100">No apps deployed yet</h3>
+                                        <p className="text-slate-400 my-4">Get started by creating your first AI application.</p>
+                                        <Link to="/" className="btn-primary text-white px-6 py-3 rounded-lg font-medium inline-block">Create Your First App</Link>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                        {apps.map(app => (
+                                            <div key={app.id} className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl p-6 card-hover relative overflow-hidden flex flex-col justify-between">
+                                                <div>
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-4 shadow-lg">
+                                                            <span className="text-white font-bold text-2xl">{(app.name || app.id).charAt(0).toUpperCase()}</span>
+                                                        </div>
+                                                        <div className="flex items-center space-x-2 z-10" onClick={e => e.stopPropagation()}>
+                                                            <StatusBadge status={app.status} />
+                                                            <div className="relative">
+                                                                <button onClick={(e) => toggleMenu(app.id, e)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-700 text-slate-400">⋯</button>
+                                                                {openMenus[app.id] && (
+                                                                    <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-20 animate-fade-in">
+                                                                        <a onClick={() => { toggleLogs(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</a>
+                                                                        <a onClick={() => { app.status === 'running' ? stopApp(app.id) : restartApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer">{app.status === 'running' ? 'Stop' : 'Start'}</a>
+                                                                        <a onClick={() => { saveTemplate(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer" disabled={savingTemplates[app.id]}>{savingTemplates[app.id] ? 'Saving…' : 'Save as Template'}</a>
+                                                                        <a onClick={() => { deleteApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 cursor-pointer">Delete App</a>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <h3 className="text-xl font-semibold text-slate-100 mb-1 truncate">{app.name || app.id}</h3>
+                                                    <p className="text-xs text-slate-500 font-mono break-all">ID: {app.id}</p>
+                                                    {app.description && <p className="text-sm text-slate-400 mt-3 h-10 line-clamp-2">{app.description}</p>}
+                                                    {app.gpu !== null && app.gpu !== undefined && <div className="mt-3"><span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400">🎮 GPU {app.gpu}</span></div>}
+                                                </div>
+                                                
+                                                {showLogs[app.id] && (
+                                                    <div className="mt-4 border-t border-slate-700 pt-4" onClick={e => e.stopPropagation()}>
+                                                        <div className="bg-slate-900 rounded-lg p-4 max-h-48 overflow-auto"><pre className="text-green-400 text-xs font-mono whitespace-pre-wrap">{logs[app.id] || 'Loading logs...'}</pre></div>
+                                                    </div>
+                                                )}
+
+                                                <div className="mt-6">
+                                                    <button onClick={() => app.url && window.open(`${nginxBase}${app.url}`, '_blank')} disabled={app.status !== 'running'} className="w-full text-center px-4 py-2 rounded-lg text-sm font-semibold transition-colors duration-200 bg-primary text-white hover:bg-primary-hover disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed">Open App</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </Route>
+                        {/* User Admin Route can be added here with similar styling */}
+                    </Switch>
+                </main>
+                
+                <footer className="border-t border-slate-700/50 mt-16">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-slate-500">
+                        <p className="text-sm">AI App Portal</p>
+                        <p className="text-xs mt-2">© {new Date().getFullYear()} - All rights reserved.</p>
+                    </div>
+                </footer>
+            </div>
+        );
     }
 
     function App() {
-      return (
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      );
+        return (
+            <BrowserRouter>
+                <AppRoutes />
+            </BrowserRouter>
+        );
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);
