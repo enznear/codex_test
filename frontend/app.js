@@ -624,14 +624,14 @@
                                                 <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-primary/50 transition-all duration-200">
                                                     <h3 className="font-semibold text-slate-100">{t.name}</h3>
                                                     <p className="text-sm text-slate-400 mt-1">{t.description}</p>
-                                                    <div className="flex items-center space-x-4 mt-3 text-xs text-slate-500">
-                                                        <span>Type: {t.type}</span><span>VRAM: {t.vram_required} MB</span>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-slate-500">
+                                                        <span className="whitespace-nowrap">Type: {t.type}</span>
+                                                        <span className="whitespace-nowrap">VRAM: {t.vram_required} MB</span>
                                                     </div>
                                                     <div className="mt-4 flex flex-wrap gap-2">
                                                         <button onClick={() => deployTemplate(t.id)} className="flex-1 bg-primary text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary-hover transition-colors" disabled={deployingTemplates[t.id]}>{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
                                                         <button onClick={() => startTemplateEdit(t)} className="flex-1 bg-slate-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-slate-500 transition-colors">Edit</button>
                                                         <button onClick={() => deleteTemplate(t.id)} className="flex-1 bg-red-500/10 text-red-400 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-500/20 transition-colors">Delete</button>
-
                                                     </div>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
