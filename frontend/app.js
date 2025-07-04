@@ -79,11 +79,11 @@
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-2">Username</label>
-                        <input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Enter your username" value={username} onChange={e => setUsername(e.target.value)} />
+                        <input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="Enter your username" value={username} onChange={e => setUsername(e.target.value)} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-2">Password</label>
-                        <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                        <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
                     </div>
                     <button type="submit" className="w-full btn-primary text-white py-3 rounded-lg font-semibold">{isRegister ? 'Register' : 'Login'}</button>
                     <p className="text-sm text-center text-slate-400">
@@ -123,7 +123,7 @@
                 <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
-                    className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/50 focus:outline-none transition-all duration-200 bg-slate-700 text-left flex items-center justify-between hover:border-slate-500"
+                    className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-primary/20 focus:outline-none transition-all duration-200 bg-slate-700 text-left flex items-center justify-between hover:border-slate-500"
                 >
                     <span className={selectedOption ? "text-slate-100" : "text-slate-400"}>
                         {selectedOption ? selectedOption.label : placeholder}
@@ -297,6 +297,12 @@
                     if (userData) {
                         setIsAdmin(userData.is_admin);
                         setCurrentUser(userData.username);
+                        if (userData.is_admin) {
+                            const userListRes = await apiFetch('/users');
+                            if (userListRes.ok) {
+                                setUsers(await userListRes.json());
+                            }
+                        }
                     }
                 } catch (error) {
                     console.error("Failed to fetch initial data:", error);
@@ -467,6 +473,12 @@
             await apiFetch('/edit_app', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app_id: editId, name: editName, description: editDesc }) });
             refreshStatus(); cancelEdit();
         };
+        const handleResetPassword = async (id) => {
+            const pw = prompt('New password:');
+            if (!pw) return;
+            await apiFetch(`/users/${id}/reset_password`, { method: 'POST', body: new URLSearchParams({ new_password: pw }) });
+            alert('Password reset');
+        };
 
         return (
             <>
@@ -554,11 +566,11 @@
                                             {/* Form Fields */}
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-400 mb-2">App Name</label>
-                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="My Awesome AI App" value={name} onChange={e => setName(e.target.value)} />
+                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="My Awesome AI App" value={name} onChange={e => setName(e.target.value)} />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
-                                                <textarea className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="Brief description of your app..." rows="3" value={description} onChange={e => setDescription(e.target.value)} />
+                                                <textarea className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="Brief description of your app..." rows="3" value={description} onChange={e => setDescription(e.target.value)} />
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
@@ -567,7 +579,7 @@
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium text-slate-400 mb-2">VRAM (MB)</label>
-                                                    <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:border-primary transition" placeholder="0" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+                                                    <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="0" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
                                                 </div>
                                             </div>
                                             <div>
@@ -683,7 +695,38 @@
                                 )}
                             </div>
                         </Route>
-                        {/* User Admin Route can be added here with similar styling */}
+                        {isAdmin && (
+                        <Route path="/user-admin">
+                            <div className="space-y-8 animate-fade-in">
+                                <div className="text-center">
+                                    <h2 className="text-4xl font-bold text-slate-100">User Management</h2>
+                                    <p className="text-slate-400 mt-2">Manage registered users</p>
+                                </div>
+                                <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl p-8">
+                                    <table className="min-w-full divide-y divide-slate-700 text-sm">
+                                        <thead>
+                                            <tr className="text-slate-400">
+                                                <th className="px-4 py-2 text-left">Username</th>
+                                                <th className="px-4 py-2">Role</th>
+                                                <th className="px-4 py-2 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-700">
+                                            {users.map(u => (
+                                                <tr key={u.id} className="hover:bg-slate-700/30">
+                                                    <td className="px-4 py-2 text-slate-100">{u.username}</td>
+                                                    <td className="px-4 py-2 text-center text-slate-300">{u.is_admin ? 'Admin' : 'User'}</td>
+                                                    <td className="px-4 py-2 text-right">
+                                                        <button onClick={() => handleResetPassword(u.id)} className="bg-primary text-white px-3 py-1 rounded-md text-xs hover:bg-primary-hover">Reset Password</button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </Route>
+                        )}
                     </Switch>
                 </main>
                 
