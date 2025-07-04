@@ -85,7 +85,7 @@
                         <label className="block text-sm font-medium text-slate-400 mb-2">Password</label>
                         <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
                     </div>
-                    <button type="submit" className="w-full btn-primary text-white py-3 rounded-lg font-semibold">{isRegister ? 'Register' : 'Login'}</button>
+                    <button type="submit" className="btn-primary text-white py-3 px-6 rounded-lg font-semibold block mx-auto">{isRegister ? 'Register' : 'Login'}</button>
                     <p className="text-sm text-center text-slate-400">
                         {isRegister ? 'Already have an account?' : "Don't have an account?"}
                         <a href="#" onClick={(e) => { e.preventDefault(); setMode(isRegister ? 'login' : 'register'); }} className="font-medium text-primary-light hover:underline ml-1">
@@ -604,7 +604,7 @@
                                                     </label>
                                                 </div>
                                             </div>
-                                            <button type="submit" className="w-full btn-primary text-white py-3 px-6 rounded-lg font-semibold text-base shadow-lg">Deploy App</button>
+                                            <button type="submit" className="btn-primary text-white py-3 px-6 rounded-lg font-semibold text-base shadow-lg block mx-auto">Deploy App</button>
                                         </form>
                                         {/* Upload Status */}
                                         {uploadProgress > 0 && (
@@ -646,7 +646,7 @@
                                                         <span className="whitespace-nowrap">Type: {t.type}</span>
                                                         <span className="whitespace-nowrap">VRAM: {t.vram_required} MB</span>
                                                     </div>
-                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 w-full btn-primary text-white py-2 rounded-md">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
+                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 btn-primary text-white py-2 px-4 rounded-md block mx-auto">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
                                         </div>
