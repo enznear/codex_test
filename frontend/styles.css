@@ -1,79 +1,103 @@
+/* Inter 폰트를 Tailwind CSS 기본 폰트로 설정 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 body {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
-.glass-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
+
+/* 상태 표시기 애니메이션 */
 .status-indicator {
-  position: relative;
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
 }
-.status-running { background-color: #10b981; }
-.status-stopped { background-color: #ef4444; }
-.status-stopping { background-color: #f59e0b; }
-.status-starting { background-color: #3b82f6; }
+
+.status-running { background-color: #22c55e; } /* green-500 */
+.status-stopped { background-color: #ef4444; } /* red-500 */
+.status-stopping { background-color: #f59e0b; } /* amber-500 */
+.status-starting { background-color: #3b82f6; } /* blue-500 */
+.status-building { background-color: #3b82f6; } /* blue-500 */
+.status-deploying { background-color: #3b82f6; } /* blue-500 */
+
+
+/* 핑(Ping) 애니메이션: 상태 표시기에 사용 */
 .status-indicator.pulse::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: inherit;
-  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: inherit;
+    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
 @keyframes ping {
-  75%, 100% {
-    transform: scale(2);
-    opacity: 0;
-  }
+    75%, 100% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
 }
+
+/* 기본 버튼 스타일 */
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); /* indigo-600 to violet-600 */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0,0,0,0.08);
 }
+
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4), 0 4px 6px -2px rgba(79, 70, 229, 0.2);
 }
+
+/* 카드 호버 효과 */
 .card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
+
+/* 파일 업로드 영역 스타일 */
 .upload-area {
-  border: 2px dashed #a5b4fc;
-  transition: all 0.3s ease;
+    border-color: #475569; /* slate-600 */
+    transition: all 0.3s ease;
 }
+
 .upload-area:hover,
 .upload-area.drag-active {
-  border-color: #667eea;
-  background-color: rgba(102, 126, 234, 0.05);
+    border-color: #4f46e5; /* indigo-600 */
+    background-color: rgba(79, 70, 229, 0.1);
 }
+
+/* 진행률 바 스타일 */
 .progress-bar {
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  transition: width 0.3s ease;
+    background: linear-gradient(90deg, #4f46e5, #a855f7); /* indigo-600 to purple-500 */
+    transition: width 0.4s ease;
 }
 
-/* input:focus,
-textarea:focus,
-select:focus {
-  outline: none !important;
-  box-shadow: none !important;
+/* 스크롤바 스타일링 (선택 사항) */
+::-webkit-scrollbar {
+    width: 8px;
 }
 
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-} */
+::-webkit-scrollbar-track {
+    background: #1e293b; /* slate-800 */
+}
+
+::-webkit-scrollbar-thumb {
+    background: #475569; /* slate-600 */
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #64748b; /* slate-500 */
+}
