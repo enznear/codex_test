@@ -213,6 +213,7 @@
         const [tEditDesc, setTEditDesc] = useState('');
         const [tEditVram, setTEditVram] = useState('0');
         const [openMenus, setOpenMenus] = useState({});
+        const [openTemplateMenus, setOpenTemplateMenus] = useState({});
         const [isAdmin, setIsAdmin] = useState(false);
         const [currentUser, setCurrentUser] = useState('');
         const [mode, setMode] = useState('login');
@@ -222,7 +223,10 @@
 
         // 메뉴 외부 클릭 시 닫기
         useEffect(() => {
-            const handleClickOutside = () => setOpenMenus({});
+            const handleClickOutside = () => {
+                setOpenMenus({});
+                setOpenTemplateMenus({});
+            };
             document.addEventListener('click', handleClickOutside);
             return () => document.removeEventListener('click', handleClickOutside);
         }, []);
@@ -406,6 +410,8 @@
         };
         const toggleMenu = (appId, e) => { e.stopPropagation(); setOpenMenus(prev => ({ [appId]: !prev[appId] })); };
         const closeMenu = (appId) => setOpenMenus(prev => ({ ...prev, [appId]: false }));
+        const toggleTemplateMenu = (id, e) => { e.stopPropagation(); setOpenTemplateMenus(prev => ({ [id]: !prev[id] })); };
+        const closeTemplateMenu = (id) => setOpenTemplateMenus(prev => ({ ...prev, [id]: false }));
         const stopApp = async (id) => { await apiFetch(`/stop/${id}`, { method: 'POST' }); refreshStatus(); };
         const restartApp = async (id) => { await apiFetch(`/restart/${id}`, { method: 'POST' }); refreshStatus(); };
         const deleteApp = async (id) => {
@@ -621,17 +627,24 @@
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2">
                                             {templates.length > 0 ? templates.map(t => (
-                                                <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-primary/50 transition-all duration-200">
-                                                    <h3 className="font-semibold text-slate-100">{t.name}</h3>
+                                                <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-primary/50 transition-all duration-200 relative">
+                                                    <div className="flex justify-between items-start">
+                                                        <h3 className="font-semibold text-slate-100">{t.name}</h3>
+                                                        <div className="relative z-10" onClick={e => e.stopPropagation()}>
+                                                            <button onClick={(e) => toggleTemplateMenu(t.id, e)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-700 text-slate-400">⋯</button>
+                                                            {openTemplateMenus[t.id] && (
+                                                                <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-20 animate-fade-in">
+                                                                    <a onClick={() => { deployTemplate(t.id); closeTemplateMenu(t.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer" disabled={deployingTemplates[t.id]}>{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</a>
+                                                                    <a onClick={() => { startTemplateEdit(t); closeTemplateMenu(t.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer">Edit</a>
+                                                                    <a onClick={() => { deleteTemplate(t.id); closeTemplateMenu(t.id); }} className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 cursor-pointer">Delete</a>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                     <p className="text-sm text-slate-400 mt-1">{t.description}</p>
                                                     <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-slate-500">
                                                         <span className="whitespace-nowrap">Type: {t.type}</span>
                                                         <span className="whitespace-nowrap">VRAM: {t.vram_required} MB</span>
-                                                    </div>
-                                                    <div className="mt-4 flex flex-wrap gap-2">
-                                                        <button onClick={() => deployTemplate(t.id)} className="flex-1 bg-primary text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary-hover transition-colors" disabled={deployingTemplates[t.id]}>{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
-                                                        <button onClick={() => startTemplateEdit(t)} className="flex-1 bg-slate-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-slate-500 transition-colors">Edit</button>
-                                                        <button onClick={() => deleteTemplate(t.id)} className="flex-1 bg-red-500/10 text-red-400 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-500/20 transition-colors">Delete</button>
                                                     </div>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
@@ -656,7 +669,7 @@
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                         {apps.map(app => (
-                                            <div key={app.id} className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl p-6 card-hover relative overflow-hidden flex flex-col justify-between">
+                                            <div key={app.id} onClick={() => app.url && app.status === 'running' && window.open(`${nginxBase}${app.url}`, '_blank')} className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl p-6 card-hover relative overflow-hidden flex flex-col justify-between cursor-pointer">
                                                 <div>
                                                     <div className="flex justify-between items-start">
                                                         <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center mb-4 shadow-lg">
@@ -690,9 +703,6 @@
                                                     </div>
                                                 )}
 
-                                                <div className="mt-6">
-                                                    <button onClick={() => app.url && window.open(`${nginxBase}${app.url}`, '_blank')} disabled={app.status !== 'running'} className="w-full text-center px-4 py-2 rounded-lg text-sm font-semibold transition-colors duration-200 bg-primary text-white hover:bg-primary-hover disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed">Open App</button>
-                                                </div>
                                             </div>
                                         ))}
                                     </div>
