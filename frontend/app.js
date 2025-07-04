@@ -29,8 +29,8 @@
             }
           },
           animation: {
-            'fade-in': 'fadeIn 0.5s ease-in-out forwards',
-            'slide-up': 'slideUp 0.5s ease-out forwards',
+            'fade-in': 'fadeIn 0.3s ease-in-out forwards',
+            'slide-up': 'slideUp 0.3s ease-out forwards',
           },
           keyframes: {
             fadeIn: {
@@ -48,7 +48,7 @@
 
     // React 및 React Router 훅 가져오기
     const { useState, useEffect, useRef } = React;
-    const { BrowserRouter, Switch, Route, Link, useLocation } = ReactRouterDOM;
+    const { BrowserRouter, Switch, Route, Link, useLocation, useHistory } = ReactRouterDOM;
 
     const nginxBase = window.location.protocol + '//' + window.location.hostname + ':8080';
 
@@ -188,6 +188,7 @@
     // 메인 앱 컴포넌트
     function AppRoutes() {
         const location = useLocation();
+        const history = useHistory();
         const [token, setToken] = useState(localStorage.getItem('token') || '');
         const [username, setUsername] = useState('');
         const [password, setPassword] = useState('');
@@ -240,6 +241,7 @@
                     if (data.access_token) {
                         localStorage.setItem('token', data.access_token);
                         setToken(data.access_token);
+                        history.push('/');
                     } else {
                         alert('Login failed');
                     }
@@ -330,7 +332,7 @@
         };
 
         useEffect(() => {
-            const interval = setInterval(refreshStatus, 2000);
+            const interval = setInterval(refreshStatus, 1000);
             return () => clearInterval(interval);
         }, [deployingApps, deployingTemplates]);
         
@@ -544,7 +546,7 @@
 
                             <div className="flex items-center space-x-4">
                                 {currentUser && <span className="text-sm text-slate-400">Welcome, {currentUser}</span>}
-                                <button onClick={() => { localStorage.removeItem('token'); setToken(''); }} className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">Logout</button>
+                                <button onClick={() => { localStorage.removeItem('token'); setToken(''); history.push('/'); }} className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">Logout</button>
                             </div>
                         </div>
                     </div>
@@ -609,7 +611,7 @@
                                     </div>
                                 </div>
                                 {/* Templates */}
-                                <div className="lg:col-span-2 space-y-6 animate-slide-up" style={{animationDelay: '0.2s'}}>
+                                <div className="lg:col-span-2 space-y-6 animate-slide-up">
                                     <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
                                         <div className="flex items-center space-x-4 mb-6">
                                             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl">⚡️</span></div>
