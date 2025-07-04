@@ -426,8 +426,35 @@
                 const res = await apiFetch('/templates');
                 setTemplates(await res.json());
                 alert('Template saved');
-            } catch { alert('Failed to save template'); } 
+            } catch { alert('Failed to save template'); }
             finally { setSavingTemplates(prev => ({ ...prev, [id]: false })); }
+        };
+        const startTemplateEdit = (t) => {
+            setTEditId(t.id);
+            setTEditName(t.name || '');
+            setTEditDesc(t.description || '');
+            setTEditVram(String(t.vram_required || 0));
+        };
+        const cancelTemplateEdit = () => {
+            setTEditId(null);
+            setTEditName('');
+            setTEditDesc('');
+            setTEditVram('0');
+        };
+        const saveTemplateEdit = async () => {
+            await apiFetch('/edit_template', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template_id: tEditId,
+                    name: tEditName,
+                    description: tEditDesc,
+                    vram_required: parseInt(tEditVram || '0', 10)
+                })
+            });
+            const res = await apiFetch('/templates');
+            setTemplates(await res.json());
+            cancelTemplateEdit();
         };
         const deleteTemplate = async (id) => {
             await apiFetch(`/templates/${id}`, { method: 'DELETE' });
@@ -442,6 +469,49 @@
         };
 
         return (
+            <>
+            {editId && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 w-96 space-y-4">
+                        <h3 className="text-xl font-semibold text-slate-100">Edit App</h3>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-1">Name</label>
+                            <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100" value={editName} onChange={e => setEditName(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-1">Description</label>
+                            <textarea rows="3" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                            <button onClick={cancelEdit} className="px-4 py-2 rounded-md bg-slate-600 text-sm">Cancel</button>
+                            <button onClick={saveEdit} className="px-4 py-2 rounded-md bg-primary text-white text-sm">Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {tEditId && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 w-96 space-y-4">
+                        <h3 className="text-xl font-semibold text-slate-100">Edit Template</h3>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-1">Name</label>
+                            <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100" value={tEditName} onChange={e => setTEditName(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-1">Description</label>
+                            <textarea rows="3" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100" value={tEditDesc} onChange={e => setTEditDesc(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-1">VRAM (MB)</label>
+                            <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100" value={tEditVram} onChange={e => setTEditVram(e.target.value)} />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                            <button onClick={cancelTemplateEdit} className="px-4 py-2 rounded-md bg-slate-600 text-sm">Cancel</button>
+                            <button onClick={saveTemplateEdit} className="px-4 py-2 rounded-md bg-primary text-white text-sm">Save</button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="min-h-screen bg-slate-900">
                 {/* Header */}
                 <header className="bg-slate-900/70 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
@@ -533,7 +603,7 @@
                                             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl">⚡️</span></div>
                                             <h2 className="text-2xl font-bold text-slate-100">Templates</h2>
                                         </div>
-                                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2">
                                             {templates.length > 0 ? templates.map(t => (
                                                 <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 hover:border-primary/50 transition-all duration-200">
                                                     <h3 className="font-semibold text-slate-100">{t.name}</h3>
@@ -541,9 +611,10 @@
                                                     <div className="flex items-center space-x-4 mt-3 text-xs text-slate-500">
                                                         <span>Type: {t.type}</span><span>VRAM: {t.vram_required} MB</span>
                                                     </div>
-                                                    <div className="mt-4 flex space-x-2">
+                                                    <div className="mt-4 flex flex-wrap gap-2">
                                                         <button onClick={() => deployTemplate(t.id)} className="flex-1 bg-primary text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary-hover transition-colors" disabled={deployingTemplates[t.id]}>{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
-                                                        <button onClick={() => deleteTemplate(t.id)} className="bg-red-500/10 text-red-400 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-500/20 transition-colors">Delete</button>
+                                                        <button onClick={() => startTemplateEdit(t)} className="flex-1 bg-slate-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-slate-500 transition-colors">Edit</button>
+                                                        <button onClick={() => deleteTemplate(t.id)} className="flex-1 bg-red-500/10 text-red-400 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-red-500/20 transition-colors">Delete</button>
                                                     </div>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
@@ -582,6 +653,7 @@
                                                                     <div className="absolute right-0 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-20 animate-fade-in">
                                                                         <a onClick={() => { toggleLogs(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer">{showLogs[app.id] ? 'Hide Logs' : 'View Logs'}</a>
                                                                         <a onClick={() => { app.status === 'running' ? stopApp(app.id) : restartApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer">{app.status === 'running' ? 'Stop' : 'Start'}</a>
+                                                                        <a onClick={() => { startEdit(app); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer">Edit</a>
                                                                         <a onClick={() => { saveTemplate(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 cursor-pointer" disabled={savingTemplates[app.id]}>{savingTemplates[app.id] ? 'Saving…' : 'Save as Template'}</a>
                                                                         <a onClick={() => { deleteApp(app.id); closeMenu(app.id); }} className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 cursor-pointer">Delete App</a>
                                                                     </div>
@@ -621,6 +693,7 @@
                     </div>
                 </footer>
             </div>
+            </>
         );
     }
 
