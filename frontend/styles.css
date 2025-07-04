@@ -105,7 +105,8 @@ body {
 /* 공통 입력 필드 포커스 스타일 */
 input:focus, textarea:focus, select:focus, .custom-select button:focus {
     outline: none;
-    box-shadow: none;
     border-color: #4f46e5; /* primary color */
-    border-width: 2px;
+    /* visually thicker border without layout shift */
+    box-shadow: 0 0 0 1px #4f46e5;
+
 }
