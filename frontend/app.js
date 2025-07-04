@@ -536,7 +536,7 @@
             <div className="min-h-screen bg-slate-900">
                 {/* Header */}
                 <header className="bg-slate-900/70 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between items-center py-4">
                             <div className="flex items-center space-x-3">
                                 <div className="w-9 h-9 bg-gradient-to-r from-primary to-secondary rounded-lg flex items-center justify-center shadow-lg">
@@ -560,11 +560,12 @@
                     </div>
                 </header>
 
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <Switch>
                         <Route exact path="/">
                             <div className="max-w-5xl mx-auto">
                                 <div className="grid grid-cols-1 gap-8">
+
                                 {/* Upload Form */}
                                 <div className="space-y-6 animate-slide-up">
                                     <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
@@ -748,7 +749,7 @@
                 </main>
                 
                 <footer className="border-t border-slate-700/50 mt-16">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-slate-500">
+                    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-slate-500">
                         <p className="text-sm">AI App Portal</p>
                         <p className="text-xs mt-2">© {new Date().getFullYear()} - All rights reserved.</p>
                     </div>
