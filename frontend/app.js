@@ -628,6 +628,7 @@
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-2">
                                             {templates.length > 0 ? templates.map(t => (
                                                 <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 relative">
+
                                                     <div className="flex justify-between items-start">
                                                         <h3 className="font-semibold text-slate-100">{t.name}</h3>
                                                         <div className="relative z-10" onClick={e => e.stopPropagation()}>
