@@ -563,9 +563,9 @@
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <Switch>
                         <Route exact path="/">
-                            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                            <div className="grid grid-cols-1 gap-8">
                                 {/* Upload Form */}
-                                <div className="lg:col-span-2 space-y-6 animate-slide-up">
+                                <div className="space-y-6 animate-slide-up">
                                     <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
                                         <div className="flex items-center space-x-4 mb-6">
                                             <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl font-bold">+</span></div>
@@ -619,7 +619,7 @@
                                     </div>
                                 </div>
                                 {/* Templates */}
-                                <div className="lg:col-span-3 space-y-6 animate-slide-up">
+                                <div className="space-y-6 animate-slide-up">
                                     <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
                                         <div className="flex items-center space-x-4 mb-6">
                                             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-lg"><span className="text-white text-2xl">⚡️</span></div>
