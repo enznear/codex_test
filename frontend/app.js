@@ -563,7 +563,9 @@
                 <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <Switch>
                         <Route exact path="/">
-                            <div className="grid grid-cols-1 gap-8">
+                            <div className="max-w-5xl mx-auto">
+                                <div className="grid grid-cols-1 gap-8">
+
                                 {/* Upload Form */}
                                 <div className="space-y-6 animate-slide-up">
                                     <div className="bg-slate-800/50 backdrop-blur-lg border border-slate-700 rounded-2xl shadow-2xl p-8">
@@ -652,6 +654,7 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                             </div>
                         </Route>
                         
