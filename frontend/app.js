@@ -29,8 +29,8 @@
             }
           },
           animation: {
-            'fade-in': 'fadeIn 0.3s ease-in-out forwards',
-            'slide-up': 'slideUp 0.3s ease-out forwards',
+            'fade-in': 'fadeIn 0.15s ease-in-out forwards',
+            'slide-up': 'slideUp 0.15s ease-out forwards',
           },
           keyframes: {
             fadeIn: {
@@ -241,7 +241,8 @@
                     if (data.access_token) {
                         localStorage.setItem('token', data.access_token);
                         setToken(data.access_token);
-                        history.push('/');
+                        window.location.href = '/';
+
                     } else {
                         alert('Login failed');
                     }
@@ -546,7 +547,8 @@
 
                             <div className="flex items-center space-x-4">
                                 {currentUser && <span className="text-sm text-slate-400">Welcome, {currentUser}</span>}
-                                <button onClick={() => { localStorage.removeItem('token'); setToken(''); history.push('/'); }} className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">Logout</button>
+                                <button onClick={() => { localStorage.removeItem('token'); setToken(''); setMode('login'); window.location.href = '/'; }} className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">Logout</button>
+
                             </div>
                         </div>
                     </div>
