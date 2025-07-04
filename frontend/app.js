@@ -242,6 +242,7 @@
                         localStorage.setItem('token', data.access_token);
                         setToken(data.access_token);
                         window.location.href = '/';
+
                     } else {
                         alert('Login failed');
                     }
@@ -547,6 +548,7 @@
                             <div className="flex items-center space-x-4">
                                 {currentUser && <span className="text-sm text-slate-400">Welcome, {currentUser}</span>}
                                 <button onClick={() => { localStorage.removeItem('token'); setToken(''); setMode('login'); window.location.href = '/'; }} className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">Logout</button>
+
                             </div>
                         </div>
                     </div>
