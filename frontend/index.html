@@ -11,6 +11,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" href="static/android-chrome-512x512.png" />
+  <link rel="stylesheet" href="static/styles.css" />
   <script>
     tailwind.config = {
       theme: {
@@ -58,87 +59,6 @@
       }
     }
   </script>
-  <style>
-    body {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-    }
-    .glass-card {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    .status-indicator {
-      position: relative;
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-    .status-running { background-color: #10b981; }
-    .status-stopped { background-color: #ef4444; }
-    .status-stopping { background-color: #f59e0b; }
-    .status-starting { background-color: #3b82f6; }
-    .status-indicator.pulse::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background: inherit;
-      animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
-    }
-    @keyframes ping {
-      75%, 100% {
-        transform: scale(2);
-        opacity: 0;
-      }
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-    }
-    .card-hover {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .card-hover:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    }
-    .upload-area {
-      border: 2px dashed #a5b4fc;
-      transition: all 0.3s ease;
-    }
-    .upload-area:hover,
-    .upload-area.drag-active {
-      border-color: #667eea;
-      background-color: rgba(102, 126, 234, 0.05);
-    }
-    .progress-bar {
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      transition: width 0.3s ease;
-    }
-   
-    /* input:focus,
-    textarea:focus,
-    select:focus {
-      outline: none !important;
-      box-shadow: none !important;
-    }
-    
-    input:focus,
-    textarea:focus,
-    select:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    } */    
-  </style>
 </head>
 <body class="font-sans">
   <div id="root"></div>
