@@ -79,11 +79,11 @@
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-2">Username</label>
-                        <input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="Enter your username" value={username} onChange={e => setUsername(e.target.value)} />
+                        <input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="Enter your username" value={username} onChange={e => setUsername(e.target.value)} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-2">Password</label>
-                        <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                        <input type="password" className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
                     </div>
                     <button type="submit" className="w-full btn-primary text-white py-3 rounded-lg font-semibold">{isRegister ? 'Register' : 'Login'}</button>
                     <p className="text-sm text-center text-slate-400">
@@ -123,7 +123,7 @@
                 <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
-                    className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-primary/20 focus:outline-none transition-all duration-200 bg-slate-700 text-left flex items-center justify-between hover:border-slate-500"
+                    className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:border-primary focus:outline-none transition-all duration-200 bg-slate-700 text-left flex items-center justify-between hover:border-slate-500"
                 >
                     <span className={selectedOption ? "text-slate-100" : "text-slate-400"}>
                         {selectedOption ? selectedOption.label : placeholder}
@@ -570,11 +570,11 @@
                                             {/* Form Fields */}
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-400 mb-2">App Name</label>
-                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="My Awesome AI App" value={name} onChange={e => setName(e.target.value)} />
+                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="My Awesome AI App" value={name} onChange={e => setName(e.target.value)} />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
-                                                <textarea className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="Brief description of your app..." rows="3" value={description} onChange={e => setDescription(e.target.value)} />
+                                                <textarea className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="Brief description of your app..." rows="3" value={description} onChange={e => setDescription(e.target.value)} />
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
@@ -583,7 +583,7 @@
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium text-slate-400 mb-2">VRAM (MB)</label>
-                                                    <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-primary focus:border-primary transition" placeholder="0" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+                                                    <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="0" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
                                                 </div>
                                             </div>
                                             <div>
