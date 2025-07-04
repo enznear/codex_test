@@ -108,4 +108,5 @@ input:focus, textarea:focus, select:focus, .custom-select button:focus {
     border-color: #4f46e5; /* primary color */
     /* visually thicker border without layout shift */
     box-shadow: 0 0 0 1px #4f46e5;
+
 }
