@@ -26,6 +26,7 @@ import re
 import time
 import asyncio
 import socket
+from typing import List
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -160,7 +161,7 @@ def init_db():
             url TEXT,
             allow_ips TEXT,
             auth_header TEXT,
-            gpu INTEGER,
+            gpus TEXT,
             vram_required INTEGER
         )
         """
@@ -200,8 +201,8 @@ def init_db():
         c.execute("ALTER TABLE apps ADD COLUMN allow_ips TEXT")
     if "auth_header" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN auth_header TEXT")
-    if "gpu" not in cols:
-        c.execute("ALTER TABLE apps ADD COLUMN gpu INTEGER")
+    if "gpus" not in cols:
+        c.execute("ALTER TABLE apps ADD COLUMN gpus TEXT")
     if "vram_required" not in cols:
         c.execute("ALTER TABLE apps ADD COLUMN vram_required INTEGER")
     if "description" not in cols:
@@ -407,7 +408,7 @@ async def reset_password(
 class StatusUpdate(BaseModel):
     app_id: str
     status: str
-    gpu: int | None = None
+    gpus: List[int] | None = None
 
 
 class Heartbeat(BaseModel):
@@ -430,7 +431,7 @@ def save_status(
     app_type: str = None,
     allow_ips: str = None,
     auth_header: str = None,
-    gpu: int = None,
+    gpus: List[int] | None = None,
     vram_required: int = None,
 ):
 
@@ -471,9 +472,9 @@ def save_status(
         if auth_header is not None:
             fields.append("auth_header=?")
             values.append(auth_header)
-        if gpu is not None:
-            fields.append("gpu=?")
-            values.append(gpu)
+        if gpus is not None:
+            fields.append("gpus=?")
+            values.append(",".join(map(str, gpus)))
         if vram_required is not None:
             fields.append("vram_required=?")
             values.append(vram_required)
@@ -482,7 +483,7 @@ def save_status(
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, description, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpu, vram_required) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO apps(id, name, description, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpus, vram_required) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 app_id,
                 name or app_id,
@@ -495,7 +496,7 @@ def save_status(
                 url,
                 allow_ips,
                 auth_header,
-                gpu,
+                ",".join(map(str, gpus)) if gpus is not None else None,
                 vram_required,
             ),
         )
@@ -919,7 +920,7 @@ async def update_status(update: StatusUpdate):
         raise HTTPException(status_code=404, detail="app not found")
 
     heartbeat_time = time.time() if update.status == "running" else None
-    save_status(update.app_id, update.status, heartbeat=heartbeat_time, gpu=update.gpu)
+    save_status(update.app_id, update.status, heartbeat=heartbeat_time, gpus=update.gpus)
     if update.status in ("error", "finished", "stopped"):
         release_app_port(update.app_id)
     return {"detail": "ok"}
@@ -970,11 +971,11 @@ async def _stop_agent_and_update_status(app_id: str):
         # Log this error or handle it more gracefully
         # For now, we'll proceed to update status to avoid app being stuck in "stopping"
         print(f"Error stopping agent for {app_id}: {e}")
-        save_status(app_id, "error", gpu=None)  # Or a more specific error status
+        save_status(app_id, "error", gpus=None)  # Or a more specific error status
         release_app_port(app_id)
         return
 
-    save_status(app_id, "stopped", gpu=None)
+    save_status(app_id, "stopped", gpus=None)
     release_app_port(app_id)
 
 
@@ -982,7 +983,7 @@ async def _stop_agent_and_update_status(app_id: str):
 async def get_status():
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
-    c.execute("SELECT id, name, description, status, url, gpu FROM apps")
+    c.execute("SELECT id, name, description, status, url, gpus FROM apps")
     rows = c.fetchall()
     conn.close()
     return [
@@ -991,7 +992,7 @@ async def get_status():
             "name": row[1],
             "status": row[3],
             "url": row[4] or f"/apps/{row[0]}/",
-            "gpu": row[5],
+            "gpus": [int(x) for x in row[5].split(',')] if row[5] else [],
             "description": row[2] or "",
         }
         for row in rows
@@ -1311,7 +1312,7 @@ async def cleanup_task():
         )
         stale = [row[0] for row in c.fetchall()]
         for app_id in stale:
-            c.execute("UPDATE apps SET status='error', gpu=NULL WHERE id=?", (app_id,))
+            c.execute("UPDATE apps SET status='error', gpus=NULL WHERE id=?", (app_id,))
             conn.commit()
             release_app_port(app_id)
             # Attempt to stop the app on the agent so lingering processes and
