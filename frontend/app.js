@@ -372,25 +372,35 @@
                     method: 'POST',
                     body: formData,
                 });
-        
+
                 const data = await res.json();
-        
+
                 if (res.ok) {
-                    setUploadMsg('Upload finished: ' + (data.app_id || ''));
                     setName('');
                     setDescription('');
                     setRunType('gradio');
                     setVramRequired('0');
                     setFiles([]);
                     await refreshStatus();
+                    setUploadProgress(100);
+                    setTimeout(() => {
+                        setUploadProgress(0);
+                        setUploadMsg('Upload finished: ' + (data.app_id || ''));
+                    }, 500);
                 } else {
-                    setUploadMsg('Error: ' + (data.detail || 'upload failed'));
+                    setUploadProgress(100);
+                    setTimeout(() => {
+                        setUploadProgress(0);
+                        setUploadMsg('Error: ' + (data.detail || 'upload failed'));
+                    }, 500);
                 }
             } catch (error) {
-                setUploadMsg('Error uploading app.');
+                setUploadProgress(100);
+                setTimeout(() => {
+                    setUploadProgress(0);
+                    setUploadMsg('Error uploading app.');
+                }, 500);
                 console.error("Upload error:", error);
-            } finally {
-                setTimeout(() => setUploadProgress(0), 3000);
             }
         };
 
