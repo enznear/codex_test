@@ -372,25 +372,35 @@
                     method: 'POST',
                     body: formData,
                 });
-        
+
                 const data = await res.json();
-        
+
                 if (res.ok) {
-                    setUploadMsg('Upload finished: ' + (data.app_id || ''));
                     setName('');
                     setDescription('');
                     setRunType('gradio');
                     setVramRequired('0');
                     setFiles([]);
                     await refreshStatus();
+                    setUploadProgress(100);
+                    setTimeout(() => {
+                        setUploadProgress(0);
+                        setUploadMsg('Upload finished: ' + (data.app_id || ''));
+                    }, 500);
                 } else {
-                    setUploadMsg('Error: ' + (data.detail || 'upload failed'));
+                    setUploadProgress(100);
+                    setTimeout(() => {
+                        setUploadProgress(0);
+                        setUploadMsg('Error: ' + (data.detail || 'upload failed'));
+                    }, 500);
                 }
             } catch (error) {
-                setUploadMsg('Error uploading app.');
+                setUploadProgress(100);
+                setTimeout(() => {
+                    setUploadProgress(0);
+                    setUploadMsg('Error uploading app.');
+                }, 500);
                 console.error("Upload error:", error);
-            } finally {
-                setTimeout(() => setUploadProgress(0), 3000);
             }
         };
 
@@ -616,7 +626,10 @@
                                             </div>
                                         )}
                                         {uploadMsg && (
-                                            <div className={`mt-4 p-3 rounded-lg text-sm ${uploadMsg.includes('Error') ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>{uploadMsg}</div>
+                                            <div className={`mt-4 p-3 rounded-lg text-sm flex items-start justify-between ${uploadMsg.includes('Error') ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
+                                                <span>{uploadMsg}</span>
+                                                <button onClick={() => setUploadMsg('')} className="ml-2 text-slate-400 hover:text-slate-200">&times;</button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
