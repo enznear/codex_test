@@ -645,7 +645,7 @@
                                             {templates.length > 0 ? templates.map(t => (
                                                 <div key={t.id} className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 relative">
 
-                                                    <div className="flex justify-between items-start">
+                                                    <div className="flex justify-between items-center">
                                                         <h3 className="font-semibold text-slate-100">{t.name}</h3>
                                                         <div className="relative z-10" onClick={e => e.stopPropagation()}>
                                                             <button onClick={(e) => toggleTemplateMenu(t.id, e)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-700 text-slate-400">⋯</button>

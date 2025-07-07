@@ -59,7 +59,7 @@ def force_rmtree(path: str):
 # Authentication setup
 SECRET_KEY = os.environ.get("SECRET_KEY", "change_me")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 60*72
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
