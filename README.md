@@ -89,6 +89,11 @@ When launching Docker images manually, ensure GPU access is enabled. Install the
 CUDA. If you want to target a specific GPU, use `--gpus device=N`. Docker maps
 the chosen GPU to `CUDA_VISIBLE_DEVICES=0` inside the container.
 
+Apps can set a `vram_required` value when uploaded. If a single GPU does not
+have enough free memory the agent will allocate multiple GPUs whose combined
+free memory satisfies the request. The selected indices are passed to Docker as
+`--gpus device=0,1` and reported by the status APIs.
+
 The backend specifies a port for each app which the agent forwards to Docker or sets as the `PORT` environment variable for Gradio scripts. Docker apps and compose services should listen on the port indicated by this variable. The proxy now rewrites incoming requests so frameworks like Gradio no longer need a `root_path` argument. The agent still sets `ROOT_PATH` for compatibility, but it can be ignored.
 
 During upload the backend now verifies that the chosen port is free by briefly

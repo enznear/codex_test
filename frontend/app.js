@@ -436,7 +436,7 @@
                 form.append('vram_required', template.vram_required);
                 const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST', body: form });
                 const data = await res.json();
-                const placeholder = { id: data.app_id, name: template.name || id, description: template.description || '', status: 'deploying', url: data.url, gpu: null };
+                const placeholder = { id: data.app_id, name: template.name || id, description: template.description || '', status: 'deploying', url: data.url, gpus: [] };
                 setDeployingApps(prev => [...prev, placeholder]);
                 setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
                 setApps(prev => [placeholder, ...prev]);
@@ -712,7 +712,7 @@
                                                     <h3 className="text-xl font-semibold text-slate-100 mb-1 truncate">{app.name || app.id}</h3>
                                                     <p className="text-xs text-slate-500 font-mono break-all">ID: {app.id}</p>
                                                     {app.description && <p className="text-sm text-slate-400 mt-3 h-10 line-clamp-2">{app.description}</p>}
-                                                    {app.gpu !== null && app.gpu !== undefined && <div className="mt-3"><span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400">🎮 GPU {app.gpu}</span></div>}
+                                                    {app.gpus && app.gpus.length > 0 && <div className="mt-3"><span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400">🎮 GPU {app.gpus.join(',')}</span></div>}
                                                 </div>
                                                 
                                                 {showLogs[app.id] && (
