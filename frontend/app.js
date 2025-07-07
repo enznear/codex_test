@@ -123,7 +123,7 @@
                 <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
-                    className="w-full px-4 py-3 border border-slate-600 rounded-lg focus:border-primary focus:outline-none transition-all duration-200 bg-slate-700 text-left flex items-center justify-between hover:border-slate-500"
+                    className="w-full px-4 py-2 border border-slate-600 rounded-lg focus:border-primary focus:outline-none transition-all duration-200 bg-slate-700 text-left flex items-center justify-between hover:border-slate-500"
                 >
                     <span className={selectedOption ? "text-slate-100" : "text-slate-400"}>
                         {selectedOption ? selectedOption.label : placeholder}
@@ -536,7 +536,7 @@
             <div className="min-h-screen bg-slate-900">
                 {/* Header */}
                 <header className="bg-slate-900/70 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
-                    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between items-center py-4">
                             <div className="flex items-center space-x-3">
                                 <div className="w-9 h-9 bg-gradient-to-r from-primary to-secondary rounded-lg flex items-center justify-center shadow-lg">
@@ -560,10 +560,10 @@
                     </div>
                 </header>
 
-                <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <Switch>
                         <Route exact path="/">
-                            <div className="max-w-5xl mx-auto">
+                            <div className="max-w-3xl mx-auto">
                                 <div className="grid grid-cols-1 gap-8">
 
                                 {/* Upload Form */}
@@ -578,11 +578,12 @@
                                             {/* Form Fields */}
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-400 mb-2">App Name</label>
-                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="My Awesome AI App" value={name} onChange={e => setName(e.target.value)} />
+                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="My Awesome AI App" value={name} onChange={e => setName(e.target.value)} />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
-                                                <textarea className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="Brief description of your app..." rows="3" value={description} onChange={e => setDescription(e.target.value)} />
+                                                <input type="text" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="Brief description of your app..." value={description} onChange={e => setDescription(e.target.value)} />
+                                                {/* <textarea className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="Brief description of your app..." rows="3" value={description} onChange={e => setDescription(e.target.value)} />                                 */}
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
@@ -591,7 +592,7 @@
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium text-slate-400 mb-2">VRAM (MB)</label>
-                                                    <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="0" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
+                                                    <input type="number" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-slate-100 focus:border-primary focus:outline-none transition" placeholder="0" value={vramRequired} onChange={e => setVramRequired(e.target.value)} />
                                                 </div>
                                             </div>
                                             <div>
@@ -606,7 +607,7 @@
                                                     </label>
                                                 </div>
                                             </div>
-                                            <button type="submit" className="btn-primary text-white py-3 px-6 rounded-lg font-semibold text-base shadow-lg block mx-auto">Deploy App</button>
+                                            <button type="submit" className="btn-primary text-white py-2 px-4 rounded-lg font-semibold text-base shadow-lg block">Deploy App</button>
                                         </form>
                                         {/* Upload Status */}
                                         {uploadProgress > 0 && (
@@ -644,11 +645,11 @@
                                                         </div>
                                                     </div>
                                                     <p className="text-sm text-slate-400 mt-1">{t.description}</p>
-                                                    <div className="flex flex-wrap items-center gap-2 mt-3 text-xs text-slate-500">
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
                                                         <span className="whitespace-nowrap">Type: {t.type}</span>
                                                         <span className="whitespace-nowrap">VRAM: {t.vram_required} MB</span>
                                                     </div>
-                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 btn-primary text-white py-2 px-4 rounded-md block mx-auto">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
+                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 btn-primary text-white py-1.5 px-3 rounded-md block">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
                                         </div>
@@ -749,7 +750,7 @@
                 </main>
                 
                 <footer className="border-t border-slate-700/50 mt-16">
-                    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-slate-500">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-slate-500">
                         <p className="text-sm">AI App Portal</p>
                         <p className="text-xs mt-2">© {new Date().getFullYear()} - All rights reserved.</p>
                     </div>
