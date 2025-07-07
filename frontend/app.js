@@ -616,7 +616,10 @@
                                             </div>
                                         )}
                                         {uploadMsg && (
-                                            <div className={`mt-4 p-3 rounded-lg text-sm ${uploadMsg.includes('Error') ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>{uploadMsg}</div>
+                                            <div className={`mt-4 p-3 rounded-lg text-sm flex items-start justify-between ${uploadMsg.includes('Error') ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
+                                                <span>{uploadMsg}</span>
+                                                <button onClick={() => setUploadMsg('')} className="ml-2 text-slate-400 hover:text-slate-200">&times;</button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
