@@ -7,7 +7,8 @@ import sys
 import httpx
 import asyncio
 import socket
-from typing import List, Optional
+import threading
+from typing import List, Optional, Set
 from proxy.proxy import add_route, remove_route, load_routes
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
@@ -18,10 +19,38 @@ app = FastAPI()
 
 PROCESSES = {}
 
+# Track which GPU indices are currently reserved so concurrent deployments
+# don't allocate the same GPU. Updated whenever apps start/stop.
+GPU_LOCK = threading.Lock()
+GPU_IN_USE: Set[int] = set()
+
+
+def reserve_gpus(indices: List[int]) -> None:
+    """Mark the given GPU indices as reserved."""
+    with GPU_LOCK:
+        GPU_IN_USE.update(indices)
+
+
+def release_gpus(indices: List[int]) -> None:
+    """Release previously reserved GPU indices."""
+    with GPU_LOCK:
+        for idx in indices:
+            GPU_IN_USE.discard(idx)
+
+
+def release_process_entry(app_id: str):
+    """Remove process entry and free its GPUs."""
+    entry = PROCESSES.pop(app_id, None)
+    if entry:
+        gpus = entry.get("gpus") or []
+        if gpus:
+            release_gpus(gpus)
+    return entry
+
 
 async def _cleanup_deleted_app(app_id: str):
     """Terminate running process and remove proxy route if backend deleted the app."""
-    entry = PROCESSES.pop(app_id, None)
+    entry = release_process_entry(app_id)
     if entry:
         proc = entry.get("proc")
         app_type = entry.get("type")
@@ -95,6 +124,8 @@ async def recover_running_apps():
                 "gpus": gpus,
                 "vram_required": 0,
             }
+            if gpus:
+                reserve_gpus(gpus)
             try:
                 async with httpx.AsyncClient() as client:
                     await client.post(
@@ -133,21 +164,35 @@ def get_available_gpu(required: int = 0) -> Optional[List[int]]:
             candidates.append((idx, free))
         if not candidates:
             return None
-        # Allocate GPUs starting from the lowest index rather than the one with
-        # the most free memory so GPU 0 is preferred when available.
-        candidates.sort(key=lambda t: t[0])
-        if required <= 0:
+        with GPU_LOCK:
+            # Exclude GPUs that have been reserved by other deployments
+            candidates = [(idx, free) for idx, free in candidates if idx not in GPU_IN_USE]
+            if not candidates:
+                return None
+            # Allocate GPUs starting from the lowest index
+            candidates.sort(key=lambda t: t[0])
+            if required <= 0:
+                for idx, free in candidates:
+                    if free > 0:
+                        GPU_IN_USE.add(idx)
+                        return [idx]
+                idx = candidates[0][0]
+                GPU_IN_USE.add(idx)
+                return [idx]
+            # Prefer a single GPU if any has enough free memory
             for idx, free in candidates:
-                if free > 0:
+                if free >= required:
+                    GPU_IN_USE.add(idx)
                     return [idx]
-            return [candidates[0][0]]
-        total_free = 0
-        chosen = []
-        for idx, free in candidates:
-            chosen.append(idx)
-            total_free += free
-            if total_free >= required:
-                return sorted(chosen)
+            # Otherwise allocate multiple GPUs sequentially
+            total_free = 0
+            chosen = []
+            for idx, free in candidates:
+                chosen.append(idx)
+                total_free += free
+                if total_free >= required:
+                    GPU_IN_USE.update(chosen)
+                    return sorted(chosen)
 
     except Exception:
         return None
@@ -254,6 +299,12 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     except Exception:
         pass
     req.gpus = gpus  # type: ignore
+    PROCESSES[req.app_id] = {
+        "proc": None,
+        "type": req.type,
+        "gpus": gpus,
+        "vram_required": req.vram_required,
+    }
     background_tasks.add_task(build_and_run, req)
     return {"detail": "building"}
 
@@ -287,6 +338,12 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     except Exception:
         pass
     req.gpus = gpus  # type: ignore
+    PROCESSES[req.app_id] = {
+        "proc": None,
+        "type": req.type,
+        "gpus": gpus,
+        "vram_required": req.vram_required,
+    }
     background_tasks.add_task(build_and_run, req)
     return {"detail": "restarting"}
 
@@ -326,6 +383,7 @@ async def build_and_run(req: RunRequest):
                 )
         finally:
             remove_route(req.app_id)
+            release_process_entry(req.app_id)
         return
 
     if not is_port_free(req.port):
@@ -338,6 +396,7 @@ async def build_and_run(req: RunRequest):
                 )
         finally:
             remove_route(req.app_id)
+            release_process_entry(req.app_id)
         return
     env = {
         "PORT": str(req.port),
@@ -367,6 +426,7 @@ async def build_and_run(req: RunRequest):
                         )
                 finally:
                     remove_route(req.app_id)
+                    release_process_entry(req.app_id)
                 return
         run_cmd = [
             "docker",
@@ -408,6 +468,7 @@ async def build_and_run(req: RunRequest):
                     )
             finally:
                 remove_route(req.app_id)
+                release_process_entry(req.app_id)
             return
         cmd = [
             "docker",
@@ -431,6 +492,7 @@ async def build_and_run(req: RunRequest):
                     )
             finally:
                 remove_route(req.app_id)
+            release_process_entry(req.app_id)
             return
         proc = None
     elif req.type == "docker_tar":
@@ -466,6 +528,7 @@ async def build_and_run(req: RunRequest):
                         )
                 finally:
                     remove_route(req.app_id)
+                    release_process_entry(req.app_id)
                 return
 
             if image_tag:
@@ -509,6 +572,7 @@ async def build_and_run(req: RunRequest):
                     )
             finally:
                 remove_route(req.app_id)
+                release_process_entry(req.app_id)
             return
 
         if gpus:
@@ -529,6 +593,7 @@ async def build_and_run(req: RunRequest):
                     )
             finally:
                 remove_route(req.app_id)
+                release_process_entry(req.app_id)
             return
 
         req_file = os.path.join(req.path, "requirements.txt")
@@ -551,6 +616,7 @@ async def build_and_run(req: RunRequest):
                         )
                 finally:
                     remove_route(req.app_id)
+                    release_process_entry(req.app_id)
                 return
 
         python_path = os.path.join("venv", "bin", "python")
@@ -698,7 +764,7 @@ async def heartbeat_loop(app_id: str):
             except Exception:
                 pass
             remove_route(app_id)
-            PROCESSES.pop(app_id, None)
+            release_process_entry(app_id)
             break
 
         try:
@@ -738,7 +804,7 @@ async def stop_app(req: StopRequest):
         except Exception:
             pass
 
-    PROCESSES.pop(req.app_id, None)
+    release_process_entry(req.app_id)
 
     # Best effort stop docker container for docker-based apps
     if app_type in ("docker", "docker_tar"):
