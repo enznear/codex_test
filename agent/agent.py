@@ -133,8 +133,13 @@ def get_available_gpu(required: int = 0) -> Optional[List[int]]:
             candidates.append((idx, free))
         if not candidates:
             return None
-        candidates.sort(key=lambda t: t[1], reverse=True)
+        # Allocate GPUs starting from the lowest index rather than the one with
+        # the most free memory so GPU 0 is preferred when available.
+        candidates.sort(key=lambda t: t[0])
         if required <= 0:
+            for idx, free in candidates:
+                if free > 0:
+                    return [idx]
             return [candidates[0][0]]
         total_free = 0
         chosen = []
