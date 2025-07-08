@@ -483,7 +483,7 @@ def save_status(
             c.execute(f"UPDATE apps SET {','.join(fields)} WHERE id=?", values)
     else:
         c.execute(
-            "INSERT INTO apps(id, name, description, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpus, vram_required) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO apps(id, name, description, type, status, log_path, port, last_heartbeat, url, allow_ips, auth_header, gpus, vram_required) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 app_id,
                 name or app_id,
