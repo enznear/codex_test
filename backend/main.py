@@ -26,6 +26,7 @@ import re
 import time
 import asyncio
 import socket
+import threading
 from typing import List
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
@@ -41,6 +42,7 @@ AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8001")
 PORT_START = int(os.environ.get("PORT_START", 9000))
 PORT_END = int(os.environ.get("PORT_END", 9100))
 AVAILABLE_PORTS = set(range(PORT_START, PORT_END))
+PORT_LOCK = threading.Lock()
 app = FastAPI()
 
 
@@ -286,7 +288,8 @@ def release_app_port(app_id: str):
     c.execute("SELECT port FROM apps WHERE id=?", (app_id,))
     row = c.fetchone()
     if row and row[0] is not None:
-        AVAILABLE_PORTS.add(row[0])
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(row[0])
         c.execute("UPDATE apps SET port=NULL WHERE id=?", (app_id,))
         conn.commit()
     conn.close()
@@ -572,17 +575,18 @@ async def upload_app(
 
     log_path = os.path.join(LOG_DIR, f"{app_id}.log")
     # Allocate a port for the app
-    if not AVAILABLE_PORTS:
-        raise HTTPException(status_code=503, detail="no available ports")
-    port = None
-    while AVAILABLE_PORTS:
-        candidate = AVAILABLE_PORTS.pop()
-        if is_port_free(candidate):
-            port = candidate
-            break
-        # port was busy, keep looking
-    if port is None:
-        raise HTTPException(status_code=503, detail="no available ports")
+    with PORT_LOCK:
+        if not AVAILABLE_PORTS:
+            raise HTTPException(status_code=503, detail="no available ports")
+        port = None
+        while AVAILABLE_PORTS:
+            candidate = AVAILABLE_PORTS.pop()
+            if is_port_free(candidate):
+                port = candidate
+                break
+            # port was busy, keep looking
+        if port is None:
+            raise HTTPException(status_code=503, detail="no available ports")
     url = f"/apps/{app_id}/"
     save_status(
         app_id,
@@ -635,7 +639,8 @@ async def upload_app(
             vram_required=vram_required,
         )
     except httpx.ConnectError:
-        AVAILABLE_PORTS.add(port)
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(port)
         save_status(
             app_id,
             "error",
@@ -650,7 +655,8 @@ async def upload_app(
             detail="Unable to reach agent. Please ensure the agent is running and reachable.",
         )
     except httpx.TimeoutException:
-        AVAILABLE_PORTS.add(port)
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(port)
         save_status(
             app_id,
             "error",
@@ -665,7 +671,8 @@ async def upload_app(
             detail="Agent request timed out. Please make sure the agent is running.",
         )
     except Exception as e:
-        AVAILABLE_PORTS.add(port)
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(port)
         save_status(
             app_id,
             "error",
@@ -809,16 +816,17 @@ async def deploy_template(template_id: str, vram_required: int | None = Form(Non
     shutil.copytree(os.path.join(TEMPLATE_DIR, template_id), app_dir)
 
     log_path = os.path.join(LOG_DIR, f"{app_id}.log")
-    if not AVAILABLE_PORTS:
-        raise HTTPException(status_code=503, detail="no available ports")
-    port = None
-    while AVAILABLE_PORTS:
-        candidate = AVAILABLE_PORTS.pop()
-        if is_port_free(candidate):
-            port = candidate
-            break
-    if port is None:
-        raise HTTPException(status_code=503, detail="no available ports")
+    with PORT_LOCK:
+        if not AVAILABLE_PORTS:
+            raise HTTPException(status_code=503, detail="no available ports")
+        port = None
+        while AVAILABLE_PORTS:
+            candidate = AVAILABLE_PORTS.pop()
+            if is_port_free(candidate):
+                port = candidate
+                break
+        if port is None:
+            raise HTTPException(status_code=503, detail="no available ports")
 
     if vram_required is None:
         vram_required = template_vram
@@ -867,7 +875,8 @@ async def deploy_template(template_id: str, vram_required: int | None = Form(Non
             description=description.strip() if description else None,
         )
     except httpx.ConnectError:
-        AVAILABLE_PORTS.add(port)
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(port)
         save_status(
             app_id,
             "error",
@@ -881,7 +890,8 @@ async def deploy_template(template_id: str, vram_required: int | None = Form(Non
             detail="Unable to reach agent. Please ensure the agent is running and reachable.",
         )
     except httpx.TimeoutException:
-        AVAILABLE_PORTS.add(port)
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(port)
         save_status(
             app_id,
             "error",
@@ -895,7 +905,8 @@ async def deploy_template(template_id: str, vram_required: int | None = Form(Non
             detail="Agent request timed out. Please make sure the agent is running.",
         )
     except Exception as e:
-        AVAILABLE_PORTS.add(port)
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(port)
         save_status(
             app_id,
             "error",
@@ -1065,18 +1076,19 @@ async def restart_app(app_id: str):
         run_path = app_dir
 
     port = stored_port if stored_port and is_port_free(stored_port) else None
-    if port is not None and port in AVAILABLE_PORTS:
-        AVAILABLE_PORTS.remove(port)
-    if port is None:
-        if not AVAILABLE_PORTS:
-            raise HTTPException(status_code=503, detail="no available ports")
-        while AVAILABLE_PORTS:
-            candidate = AVAILABLE_PORTS.pop()
-            if is_port_free(candidate):
-                port = candidate
-                break
+    with PORT_LOCK:
+        if port is not None and port in AVAILABLE_PORTS:
+            AVAILABLE_PORTS.remove(port)
         if port is None:
-            raise HTTPException(status_code=503, detail="no available ports")
+            if not AVAILABLE_PORTS:
+                raise HTTPException(status_code=503, detail="no available ports")
+            while AVAILABLE_PORTS:
+                candidate = AVAILABLE_PORTS.pop()
+                if is_port_free(candidate):
+                    port = candidate
+                    break
+            if port is None:
+                raise HTTPException(status_code=503, detail="no available ports")
 
     try:
         async with httpx.AsyncClient() as client:
@@ -1106,7 +1118,8 @@ async def restart_app(app_id: str):
             vram_required=vram_required,
         )
     except Exception as e:
-        AVAILABLE_PORTS.add(port)
+        with PORT_LOCK:
+            AVAILABLE_PORTS.add(port)
         save_status(
             app_id,
             "error",
