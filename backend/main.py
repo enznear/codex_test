@@ -37,6 +37,7 @@ UPLOAD_DIR = "./uploads"
 LOG_DIR = "./logs"
 TEMPLATE_DIR = "./templates"
 AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8001")
+AGENT_TIMEOUT = int(os.environ.get("AGENT_TIMEOUT", 30))
 
 # Port range to allocate for running apps
 PORT_START = int(os.environ.get("PORT_START", 9000))
@@ -625,7 +626,7 @@ async def upload_app(
                     "auth_header": auth_header,
                     "vram_required": vram_required,
                 },
-                timeout=5,
+                timeout=AGENT_TIMEOUT,
             )
             resp.raise_for_status()
         save_status(
@@ -863,7 +864,7 @@ async def deploy_template(template_id: str, vram_required: int | None = Form(Non
                     "auth_header": None,
                     "vram_required": vram_required,
                 },
-                timeout=5,
+                timeout=AGENT_TIMEOUT,
             )
             resp.raise_for_status()
         save_status(
@@ -1104,7 +1105,7 @@ async def restart_app(app_id: str):
                     "auth_header": auth_header,
                     "vram_required": vram_required,
                 },
-                timeout=5,
+                timeout=AGENT_TIMEOUT,
             )
             resp.raise_for_status()
         save_status(
@@ -1213,7 +1214,7 @@ async def delete_app(app_id: str):
                 await client.post(
                     f"{AGENT_URL}/stop",
                     json={"app_id": app_id},
-                    timeout=5,
+                    timeout=AGENT_TIMEOUT,
                 )
         except Exception:
             pass
@@ -1224,7 +1225,7 @@ async def delete_app(app_id: str):
                 await client.post(
                     f"{AGENT_URL}/remove_route",
                     json={"app_id": app_id},
-                    timeout=5,
+                    timeout=AGENT_TIMEOUT,
                 )
         except Exception:
             pass
@@ -1337,7 +1338,7 @@ async def cleanup_task():
                     resp = await client.post(
                         f"{AGENT_URL}/stop",
                         json={"app_id": app_id},
-                        timeout=5,
+                        timeout=AGENT_TIMEOUT,
                     )
                     resp.raise_for_status()
             except Exception:
@@ -1346,7 +1347,7 @@ async def cleanup_task():
                         await client.post(
                             f"{AGENT_URL}/remove_route",
                             json={"app_id": app_id},
-                            timeout=5,
+                            timeout=AGENT_TIMEOUT,
                         )
                 except Exception:
                     pass

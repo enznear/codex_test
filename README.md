@@ -119,6 +119,8 @@ uvicorn agent.agent:app --port 8001
 
 - `AGENT_URL`: URL where the agent can be reached (used by the backend).
   Defaults to `http://localhost:8001`.
+- `AGENT_TIMEOUT`: Timeout in seconds for requests from the backend to the agent.
+  Defaults to `30`.
 - `BACKEND_URL`: URL of the backend API (used by the agent).
   Defaults to `http://localhost:8000`.
 - `PROXY_LINK_PATH`: path where the agent attempts to symlink the generated
