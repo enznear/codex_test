@@ -219,6 +219,7 @@
         const [mode, setMode] = useState('login');
         const [deployingApps, setDeployingApps] = useState([]);
         const [deployingTemplates, setDeployingTemplates] = useState({});
+        const templateDeploying = Object.keys(deployingTemplates).length > 0;
         const [savingTemplates, setSavingTemplates] = useState({});
 
         // 메뉴 외부 클릭 시 닫기
@@ -673,7 +674,7 @@
                                                         <span className="whitespace-nowrap">Type: {t.type}</span>
                                                         <span className="whitespace-nowrap">VRAM: {t.vram_required} MB</span>
                                                     </div>
-                                                    <button onClick={() => deployTemplate(t.id)} disabled={deployingTemplates[t.id]} className="mt-4 btn-primary text-white py-1.5 px-3 rounded-md block">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
+                                                    <button onClick={() => deployTemplate(t.id)} disabled={templateDeploying} className="mt-4 btn-primary text-white py-1.5 px-3 rounded-md block">{deployingTemplates[t.id] ? 'Deploying...' : 'Deploy'}</button>
                                                 </div>
                                             )) : <p className="text-slate-400 text-center py-8">No templates available.</p>}
                                         </div>
