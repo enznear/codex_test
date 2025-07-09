@@ -44,6 +44,7 @@ PORT_START = int(os.environ.get("PORT_START", 9000))
 PORT_END = int(os.environ.get("PORT_END", 9100))
 AVAILABLE_PORTS = set(range(PORT_START, PORT_END))
 PORT_LOCK = threading.Lock()
+TEMPLATE_DEPLOY_LOCK = asyncio.Lock()
 app = FastAPI()
 
 
@@ -798,8 +799,7 @@ async def list_templates():
     ]
 
 
-@app.post("/deploy_template/{template_id}")
-async def deploy_template(template_id: str, vram_required: int | None = Form(None)):
+async def _deploy_template_impl(template_id: str, vram_required: int | None):
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute(
@@ -918,7 +918,16 @@ async def deploy_template(template_id: str, vram_required: int | None = Form(Non
         )
         raise HTTPException(status_code=500, detail=str(e))
 
+
     return {"app_id": app_id, "url": url}
+
+
+@app.post("/deploy_template/{template_id}")
+async def deploy_template(template_id: str, vram_required: int | None = Form(None)):
+    if TEMPLATE_DEPLOY_LOCK.locked():
+        raise HTTPException(status_code=409, detail="another template deployment is in progress")
+    async with TEMPLATE_DEPLOY_LOCK:
+        return await _deploy_template_impl(template_id, vram_required)
 
 
 @app.post("/update_status")
