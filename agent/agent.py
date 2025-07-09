@@ -8,7 +8,7 @@ import httpx
 import asyncio
 import socket
 import threading
-from typing import List, Optional, Set
+from typing import List, Optional, Dict
 from proxy.proxy import add_route, remove_route, load_routes
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
@@ -19,23 +19,27 @@ app = FastAPI()
 
 PROCESSES = {}
 
-# Track which GPU indices are currently reserved so concurrent deployments
-# don't allocate the same GPU. Updated whenever apps start/stop.
+# Track reserved VRAM per GPU so concurrent deployments do not over allocate.
 GPU_LOCK = threading.Lock()
-GPU_IN_USE: Set[int] = set()
+GPU_USAGE: Dict[int, int] = {}
 
 
-def reserve_gpus(indices: List[int]) -> None:
-    """Mark the given GPU indices as reserved."""
+def reserve_gpus(usage: Dict[int, int]) -> None:
+    """Increase reserved VRAM for the given GPU indices."""
     with GPU_LOCK:
-        GPU_IN_USE.update(indices)
+        for idx, amount in usage.items():
+            GPU_USAGE[idx] = GPU_USAGE.get(idx, 0) + amount
 
 
-def release_gpus(indices: List[int]) -> None:
-    """Release previously reserved GPU indices."""
+def release_gpus(usage: Dict[int, int]) -> None:
+    """Decrease reserved VRAM for the given GPU indices."""
     with GPU_LOCK:
-        for idx in indices:
-            GPU_IN_USE.discard(idx)
+        for idx, amount in usage.items():
+            remaining = GPU_USAGE.get(idx, 0) - amount
+            if remaining > 0:
+                GPU_USAGE[idx] = remaining
+            else:
+                GPU_USAGE.pop(idx, None)
 
 
 def release_process_entry(app_id: str):
@@ -43,8 +47,10 @@ def release_process_entry(app_id: str):
     entry = PROCESSES.pop(app_id, None)
     if entry:
         gpus = entry.get("gpus") or []
+        vram = entry.get("vram_required") or 0
         if gpus:
-            release_gpus(gpus)
+            usage = {idx: vram for idx in gpus}
+            release_gpus(usage)
     return entry
 
 
@@ -117,15 +123,18 @@ async def recover_running_apps():
                 s.close()
 
         if container_running or port_running:
-            gpus = status_map.get(app_id, {}).get("gpus")
+            status = status_map.get(app_id, {})
+            gpus = status.get("gpus")
+            vram_required = status.get("vram_required", 0)
             PROCESSES[app_id] = {
                 "proc": None,
                 "type": "docker" if is_docker else "gradio",
                 "gpus": gpus,
-                "vram_required": 0,
+                "vram_required": vram_required,
             }
             if gpus:
-                reserve_gpus(gpus)
+                usage = {idx: vram_required for idx in gpus}
+                reserve_gpus(usage)
             try:
                 async with httpx.AsyncClient() as client:
                     await client.post(
@@ -142,7 +151,7 @@ async def recover_running_apps():
 
 def get_available_gpu(required: int = 0) -> Optional[List[int]]:
 
-    """Return a list of GPU indices whose combined free memory satisfies ``required``."""
+    """Return GPUs that have enough free memory for ``required`` MB."""
     try:
         output = subprocess.check_output(
             [
@@ -152,7 +161,8 @@ def get_available_gpu(required: int = 0) -> Optional[List[int]]:
             ],
             encoding="utf-8",
         )
-        candidates = []
+
+        info = []
         for line in output.splitlines():
             parts = [p.strip() for p in line.split(",")]
             if len(parts) != 3:
@@ -160,43 +170,38 @@ def get_available_gpu(required: int = 0) -> Optional[List[int]]:
             idx = int(parts[0])
             total = int(parts[1])
             used_mem = int(parts[2])
-            free = total - used_mem
-            candidates.append((idx, free))
-        if not candidates:
+            info.append((idx, total, used_mem))
+
+        if not info:
             return None
+
         with GPU_LOCK:
-            # Exclude GPUs that have been reserved by other deployments
-            candidates = [(idx, free) for idx, free in candidates if idx not in GPU_IN_USE]
+            candidates = []
+            for idx, total, used_mem in info:
+                free = total - used_mem - GPU_USAGE.get(idx, 0)
+                candidates.append((idx, free))
+
+            candidates = [(idx, free) for idx, free in candidates if free > 0]
             if not candidates:
                 return None
-            # Allocate GPUs starting from the lowest index
+
+            # sort by index for deterministic allocation
             candidates.sort(key=lambda t: t[0])
+
             if required <= 0:
-                for idx, free in candidates:
-                    if free > 0:
-                        GPU_IN_USE.add(idx)
-                        return [idx]
-                idx = candidates[0][0]
-                GPU_IN_USE.add(idx)
-                return [idx]
-            # Prefer a single GPU if any has enough free memory
+                return [candidates[0][0]]
+
+            # try single GPU first
             for idx, free in candidates:
                 if free >= required:
-                    GPU_IN_USE.add(idx)
+                    GPU_USAGE[idx] = GPU_USAGE.get(idx, 0) + required
                     return [idx]
-            # Otherwise allocate multiple GPUs sequentially
-            total_free = 0
-            chosen = []
-            for idx, free in candidates:
-                chosen.append(idx)
-                total_free += free
-                if total_free >= required:
-                    GPU_IN_USE.update(chosen)
-                    return sorted(chosen)
+
+            # otherwise insufficient memory
+            return None
 
     except Exception:
         return None
-    return None
 
 
 class RunRequest(BaseModel):
