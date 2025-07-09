@@ -436,16 +436,21 @@
                 form.append('vram_required', template.vram_required);
                 const res = await apiFetch(`/deploy_template/${id}`, { method: 'POST', body: form });
                 const data = await res.json();
-                const placeholder = {
-                    id: data.app_id,
-                    name: template.name || id,
-                    description: template.description || '',
-                    status: 'deploying',
-                    url: data.url,
-                    gpus: []
-                };
-                setDeployingApps(prev => [...prev, placeholder]);
-                setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
+                if (res.ok) {
+                    const placeholder = {
+                        id: data.app_id,
+                        name: template.name || id,
+                        description: template.description || '',
+                        status: 'deploying',
+                        url: data.url,
+                        gpus: []
+                    };
+                    setDeployingApps(prev => [...prev, placeholder]);
+                    setDeployingTemplates(prev => ({ ...prev, [id]: data.app_id }));
+                } else {
+                    alert('Deploy failed: ' + (data.detail || '')); // display error
+                    setDeployingTemplates(prev => { const n = { ...prev }; delete n[id]; return n; });
+                }
             } catch {
                 setDeployingTemplates(prev => { const n = { ...prev }; delete n[id]; return n; });
             }
