@@ -566,7 +566,10 @@ async def build_and_run(req: RunRequest):
         proc = await async_run_detached(run_cmd, req.log_path, env=env)
     else:  # gradio
         py_files = [f for f in os.listdir(req.path) if f.endswith(".py")]
-        target = py_files[0] if py_files else None
+        if "app.py" in py_files:
+            target = "app.py"
+        else:
+            target = py_files[0] if py_files else None
         if not target:
             try:
                 async with httpx.AsyncClient() as client:
