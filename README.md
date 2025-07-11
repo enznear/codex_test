@@ -54,7 +54,7 @@ uvicorn backend.main:app --reload
 ### Uploading Gradio or Docker apps
 
 1. **Prepare your files**
-   - **Gradio**: upload a single Python file or a zip archive containing your Gradio app. The backend will run the first `.py` file it finds in the uploaded directory.
+   - **Gradio**: upload a single Python file or a zip archive containing your Gradio app. If an `app.py` file is present it will be used; otherwise the backend runs the first `.py` file it finds in the uploaded directory.
      If the archive contains a `requirements.txt` file it will be installed into
      a fresh Python **3.10** virtual environment which is then used to run the
      script.
