@@ -1029,6 +1029,17 @@ async def get_logs(app_id: str):
         return f.read()
 
 
+@app.get("/files/{app_id}/{filename}")
+async def download_file(app_id: str, filename: str):
+    """Return a file from the uploads directory as an attachment."""
+    if not ALLOWED_FILENAME.fullmatch(filename):
+        raise HTTPException(status_code=400, detail="invalid filename")
+    path = os.path.join(UPLOAD_DIR, app_id, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="file not found")
+    return FileResponse(path, filename=filename)
+
+
 @app.post("/stop/{app_id}")
 async def stop_app_by_id(app_id: str, background_tasks: BackgroundTasks):
     """Stop a running app via the agent and mark it stopped."""
