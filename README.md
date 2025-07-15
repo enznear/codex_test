@@ -46,6 +46,7 @@ uvicorn backend.main:app --reload
   - `auth_header`: header value required for access (sent as `Authorization`, optional).
 - `GET /status`: check running status of apps.
 - `GET /logs/{app_id}`: view logs for an app.
+- `GET /files/{app_id}/{filename}`: download a stored file as an attachment.
 - `POST /update_status`: (used by agent) update status in the database.
 - `POST /stop/{app_id}`: stop a running app.
 - `POST /restart/{app_id}`: restart a previously uploaded Docker app using the existing image.
