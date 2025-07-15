@@ -8,7 +8,7 @@ import httpx
 import asyncio
 import socket
 import threading
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from proxy.proxy import add_route, remove_route, load_routes
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
@@ -46,11 +46,15 @@ def release_process_entry(app_id: str):
     """Remove process entry and free its GPUs."""
     entry = PROCESSES.pop(app_id, None)
     if entry:
-        gpus = entry.get("gpus") or []
-        vram = entry.get("vram_required") or 0
-        if gpus:
-            usage = {idx: vram for idx in gpus}
+        usage = entry.get("gpu_usage")
+        if usage:
             release_gpus(usage)
+        else:
+            gpus = entry.get("gpus") or []
+            vram = entry.get("vram_required") or 0
+            if gpus:
+                usage = {idx: vram for idx in gpus}
+                release_gpus(usage)
     return entry
 
 
@@ -149,9 +153,14 @@ async def recover_running_apps():
             # Stale route with no running process
             remove_route(app_id)
 
-def get_available_gpu(required: int = 0) -> Optional[List[int]]:
+def get_available_gpu(required: int = 0) -> Optional[Tuple[List[int], Dict[int, int]]]:
 
-    """Return GPUs that have enough free memory for ``required`` MB."""
+    """Return GPUs that have enough free memory for ``required`` MB.
+
+    Returns the selected GPU indices and a mapping of index to reserved
+    memory amount. The caller should store this usage so it can be
+    released later.
+    """
     try:
         output = subprocess.check_output(
             [
@@ -189,13 +198,28 @@ def get_available_gpu(required: int = 0) -> Optional[List[int]]:
             candidates.sort(key=lambda t: t[0])
 
             if required <= 0:
-                return [candidates[0][0]]
+                return [candidates[0][0]], {candidates[0][0]: 0}
 
             # try single GPU first
             for idx, free in candidates:
                 if free >= required:
                     GPU_USAGE[idx] = GPU_USAGE.get(idx, 0) + required
-                    return [idx]
+                    return [idx], {idx: required}
+
+            # attempt multi-GPU allocation
+            allocation: Dict[int, int] = {}
+            remaining = required
+            for idx, free in candidates:
+                if remaining <= 0:
+                    break
+                take = min(remaining, free)
+                allocation[idx] = take
+                remaining -= take
+
+            if remaining <= 0:
+                for idx, amt in allocation.items():
+                    GPU_USAGE[idx] = GPU_USAGE.get(idx, 0) + amt
+                return list(allocation.keys()), allocation
 
             # attempt multi-GPU allocation
             allocation: Dict[int, int] = {}
@@ -229,6 +253,7 @@ class RunRequest(BaseModel):
     reuse_image: bool = False
     gpus: Optional[List[int]] = None
     vram_required: int = 0
+    gpu_usage: Optional[Dict[int, int]] = None
 
 
 
@@ -294,8 +319,8 @@ async def async_run_detached(cmd, log_path, env=None, cwd=None):
 async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     # configure the proxy for the assigned port and start build/run in background
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
-    gpus = get_available_gpu(req.vram_required)
-    if gpus is None:
+    result = get_available_gpu(req.vram_required)
+    if result is None:
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(
@@ -308,6 +333,8 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
         remove_route(req.app_id)
         raise HTTPException(status_code=500, detail="No available GPU")
 
+    gpus, usage = result
+
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
@@ -318,11 +345,13 @@ async def run_app(req: RunRequest, background_tasks: BackgroundTasks):
     except Exception:
         pass
     req.gpus = gpus  # type: ignore
+    req.gpu_usage = usage  # type: ignore
     PROCESSES[req.app_id] = {
         "proc": None,
         "type": req.type,
         "gpus": gpus,
         "vram_required": req.vram_required,
+        "gpu_usage": usage,
     }
     background_tasks.add_task(build_and_run, req)
     return {"detail": "building"}
@@ -333,8 +362,8 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     """Restart an app using an existing Docker image."""
     req.reuse_image = True
     add_route(req.app_id, req.port, req.allow_ips, req.auth_header)
-    gpus = get_available_gpu(req.vram_required)
-    if gpus is None:
+    result = get_available_gpu(req.vram_required)
+    if result is None:
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(
@@ -347,6 +376,8 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
         remove_route(req.app_id)
         raise HTTPException(status_code=500, detail="No available GPU")
 
+    gpus, usage = result
+
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
@@ -357,11 +388,13 @@ async def restart_app(req: RunRequest, background_tasks: BackgroundTasks):
     except Exception:
         pass
     req.gpus = gpus  # type: ignore
+    req.gpu_usage = usage  # type: ignore
     PROCESSES[req.app_id] = {
         "proc": None,
         "type": req.type,
         "gpus": gpus,
         "vram_required": req.vram_required,
+        "gpu_usage": usage,
     }
     background_tasks.add_task(build_and_run, req)
     return {"detail": "restarting"}
@@ -391,19 +424,24 @@ async def wait_for_http_ready(app_id: str, port: int, proc):
 
 async def build_and_run(req: RunRequest):
     """Build docker image if needed then run the app."""
-    gpus = req.gpus if req.gpus is not None else get_available_gpu(req.vram_required)
-    if gpus is None:
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"{BACKEND_URL}/update_status",
-                    json={"app_id": req.app_id, "status": "error", "gpus": None},
-                    timeout=5,
-                )
-        finally:
-            remove_route(req.app_id)
-            release_process_entry(req.app_id)
-        return
+    if req.gpus is not None:
+        gpus = req.gpus
+        usage = req.gpu_usage or {idx: req.vram_required for idx in gpus}
+    else:
+        result = get_available_gpu(req.vram_required)
+        if result is None:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"{BACKEND_URL}/update_status",
+                        json={"app_id": req.app_id, "status": "error", "gpus": None},
+                        timeout=5,
+                    )
+            finally:
+                remove_route(req.app_id)
+                release_process_entry(req.app_id)
+            return
+        gpus, usage = result
 
     if not is_port_free(req.port):
         try:
@@ -648,7 +686,13 @@ async def build_and_run(req: RunRequest):
 
     # Store the process along with the type so that cleanup can behave
     # differently for docker vs gradio apps
-    PROCESSES[req.app_id] = {"proc": proc, "type": req.type, "gpus": gpus, "vram_required": req.vram_required}
+    PROCESSES[req.app_id] = {
+        "proc": proc,
+        "type": req.type,
+        "gpus": gpus,
+        "vram_required": req.vram_required,
+        "gpu_usage": usage,
+    }
     asyncio.create_task(heartbeat_loop(req.app_id))
     if req.type == "docker_compose":
         asyncio.create_task(wait_for_compose_ready(req.app_id, req.port))

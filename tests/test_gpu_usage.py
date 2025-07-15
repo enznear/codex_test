@@ -41,12 +41,18 @@ def test_partial_allocation(monkeypatch):
     monkeypatch.setattr(agent, 'subprocess', dummy)
     reset_state()
 
-    gpus = agent.get_available_gpu(2000)
+    res = agent.get_available_gpu(2000)
+    assert res is not None
+    gpus, usage = res
     assert gpus == [0]
+    assert usage == {0: 2000}
     assert agent.GPU_USAGE[0] == 2000
 
-    gpus = agent.get_available_gpu(7000)
+    res = agent.get_available_gpu(7000)
+    assert res is not None
+    gpus, usage = res
     assert gpus == [1]
+    assert usage == {1: 7000}
     assert agent.GPU_USAGE[1] == 7000
 
     agent.release_gpus({0: 2000})
@@ -59,13 +65,16 @@ def test_release_process_entry(monkeypatch):
     monkeypatch.setattr(agent, 'subprocess', dummy)
     reset_state()
 
-    gpus = agent.get_available_gpu(4000)
+    res = agent.get_available_gpu(4000)
+    assert res is not None
+    gpus, usage = res
     assert gpus == [0]
     agent.PROCESSES['app'] = {
         'proc': None,
         'type': 'docker',
         'gpus': gpus,
         'vram_required': 4000,
+        'gpu_usage': usage,
     }
     assert agent.GPU_USAGE[0] == 4000
 
@@ -80,7 +89,10 @@ def test_multi_gpu_allocation(monkeypatch):
     monkeypatch.setattr(agent, 'subprocess', dummy)
     reset_state()
 
-    gpus = agent.get_available_gpu(60000)
+    res = agent.get_available_gpu(60000)
+    assert res is not None
+    gpus, usage = res
     assert gpus == [0, 1]
+    assert usage == {0: 39000, 1: 21000}
     assert agent.GPU_USAGE[0] == 39000
     assert agent.GPU_USAGE[1] == 21000
