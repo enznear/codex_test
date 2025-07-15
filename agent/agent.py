@@ -179,9 +179,9 @@ def get_available_gpu(required: int = 0) -> Optional[List[int]]:
             candidates = []
             for idx, total, used_mem in info:
                 free = total - used_mem - GPU_USAGE.get(idx, 0)
-                candidates.append((idx, free))
+                if free > 0:
+                    candidates.append((idx, free))
 
-            candidates = [(idx, free) for idx, free in candidates if free > 0]
             if not candidates:
                 return None
 
@@ -196,6 +196,20 @@ def get_available_gpu(required: int = 0) -> Optional[List[int]]:
                 if free >= required:
                     GPU_USAGE[idx] = GPU_USAGE.get(idx, 0) + required
                     return [idx]
+
+            # attempt multi-GPU allocation
+            allocation: Dict[int, int] = {}
+            remaining = required
+            for idx, free in candidates:
+                if remaining <= 0:
+                    break
+                take = min(remaining, free)
+                allocation[idx] = take
+                remaining -= take
+
+            if remaining <= 0:
+                reserve_gpus(allocation)
+                return list(allocation.keys())
 
             # otherwise insufficient memory
             return None
