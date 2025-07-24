@@ -20,6 +20,13 @@ class DummyAsyncClient:
 httpx_stub.AsyncClient = DummyAsyncClient
 sys.modules.setdefault("httpx", httpx_stub)
 
+# Minimal pydantic stub so agent can be imported
+pydantic_stub = types.ModuleType("pydantic")
+class _BaseModel:
+    pass
+pydantic_stub.BaseModel = _BaseModel
+sys.modules.setdefault("pydantic", pydantic_stub)
+
 import agent.agent as agent
 
 # Helper to patch subprocess.check_output for nvidia-smi
@@ -43,6 +50,7 @@ def test_partial_allocation(monkeypatch):
 
     res = agent.get_available_gpu(2000)
     assert res is not None
+    assert isinstance(res, tuple)
     gpus, usage = res
     assert gpus == [0]
     assert usage == {0: 2000}
@@ -50,6 +58,7 @@ def test_partial_allocation(monkeypatch):
 
     res = agent.get_available_gpu(7000)
     assert res is not None
+    assert isinstance(res, tuple)
     gpus, usage = res
     assert gpus == [1]
     assert usage == {1: 7000}
@@ -67,6 +76,7 @@ def test_release_process_entry(monkeypatch):
 
     res = agent.get_available_gpu(4000)
     assert res is not None
+    assert isinstance(res, tuple)
     gpus, usage = res
     assert gpus == [0]
     agent.PROCESSES['app'] = {
@@ -91,6 +101,7 @@ def test_multi_gpu_allocation(monkeypatch):
 
     res = agent.get_available_gpu(60000)
     assert res is not None
+    assert isinstance(res, tuple)
     gpus, usage = res
     assert gpus == [0, 1]
     assert usage == {0: 39000, 1: 21000}

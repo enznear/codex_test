@@ -5,6 +5,12 @@ import sys
 import types
 
 sys.modules.setdefault("httpx", types.ModuleType("httpx"))
+# Minimal pydantic stub
+pydantic_mod = types.ModuleType("pydantic")
+class _BaseModel:
+    pass
+pydantic_mod.BaseModel = _BaseModel
+sys.modules.setdefault("pydantic", pydantic_mod)
 # Minimal FastAPI stub to avoid heavy dependencies during import
 fastapi_mod = types.ModuleType("fastapi")
 
