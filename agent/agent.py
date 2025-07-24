@@ -221,20 +221,6 @@ def get_available_gpu(required: int = 0) -> Optional[Tuple[List[int], Dict[int, 
                     GPU_USAGE[idx] = GPU_USAGE.get(idx, 0) + amt
                 return list(allocation.keys()), allocation
 
-            # attempt multi-GPU allocation
-            allocation: Dict[int, int] = {}
-            remaining = required
-            for idx, free in candidates:
-                if remaining <= 0:
-                    break
-                take = min(remaining, free)
-                allocation[idx] = take
-                remaining -= take
-
-            if remaining <= 0:
-                reserve_gpus(allocation)
-                return list(allocation.keys())
-
             # otherwise insufficient memory
             return None
 
